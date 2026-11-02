@@ -1,6 +1,6 @@
 A testing preview of the independent Android DNS blocker, with encrypted upstream DNS and reliability fixes.
 
-- Allowed lookups use reusable, certificate-verified Cloudflare DNS-over-TLS connections; no plaintext fallback. Networks blocking port 853 can prevent allowed lookups.
+- Allowed lookups use reusable, certificate-verified Cloudflare DNS-over-HTTPS connections; no plaintext fallback. Networks blocking port 443 can prevent allowed lookups.
 - Tunnel creation and shutdown share a lifecycle lock; stop/revoke closes tunnel, worker pool and upstream connections.
 - Corrected EDNS response validation, synthetic error framing, malformed packet bounds and oversized UDP answer handling.
 - Kept bounded statistics on reload, added readable day labels/chart accessibility text, and disabled unsupported Android always-on mode.

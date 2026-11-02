@@ -51,7 +51,7 @@ A separate app based on Blockbrowser's ad blocking, filtering across Android app
 - Not every ad can be blocked; same-domain ads remain.
 - Private DNS, app-specific DoH/DoT, hard-coded addresses and cached answers can bypass the DNS filter.
 - One VPN app per Android profile. No concurrent privacy VPN or lockdown compatibility.
-- Upstream DNS now uses TLS; port 853 must be reachable. Client TCP DNS and encrypted-DNS interception are not implemented.
+- Upstream DNS now uses TLS; port 443 must be reachable. Client TCP DNS and encrypted-DNS interception are not implemented.
 - Per-app statistics, cosmetic filtering, traffic forwarding and bandwidth saving measurements do not exist.
 - Shutdown synchronization and large UDP reply truncation are implemented; new runtime/regression checks must pass before verified claims.
 - Buffered stats may lose the latest increments after abrupt process death; history has retention caps.
