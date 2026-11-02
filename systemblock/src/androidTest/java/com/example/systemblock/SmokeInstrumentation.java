@@ -50,12 +50,23 @@ public final class SmokeInstrumentation extends Instrumentation {
   while(SystemClock.elapsedRealtime()<until){if(BlockVpn.running==expected && (expected || BlockVpn.status.startsWith("Stopped")))return;Thread.sleep(50);}
   throw new AssertionError("Service state timeout: "+BlockVpn.status);
  }
- private static byte[] lookup(String domain)throws Exception{
+ private byte[] lookup(String domain)throws Exception{
+  android.net.ConnectivityManager cm=getTargetContext().getSystemService(android.net.ConnectivityManager.class);
+  android.net.Network vpn=null;long until=SystemClock.elapsedRealtime()+10000;
+  while(vpn==null && SystemClock.elapsedRealtime()<until){
+   for(android.net.Network network:cm.getAllNetworks()){
+    android.net.NetworkCapabilities caps=cm.getNetworkCapabilities(network);
+    if(caps!=null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)){vpn=network;break;}
+   }
+   if(vpn==null)Thread.sleep(50);
+  }
+  if(vpn==null)throw new AssertionError("VPN network not published");
   java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();
   bytes.write(new byte[]{1,2,1,0,0,1,0,0,0,0,0,0});
   for(String label:domain.split("\\.")){bytes.write(label.length());bytes.write(label.getBytes(java.nio.charset.StandardCharsets.US_ASCII));}
   bytes.write(new byte[]{0,0,1,0,1});byte[] q=bytes.toByteArray();
   try(DatagramSocket socket=new DatagramSocket()){
+   vpn.bindSocket(socket);
    socket.setSoTimeout(12000);socket.connect(InetAddress.getByName("10.111.0.2"),53);
    socket.send(new DatagramPacket(q,q.length));byte[] buf=new byte[4096];DatagramPacket a=new DatagramPacket(buf,buf.length);socket.receive(a);
    byte[] answer=java.util.Arrays.copyOf(buf,a.getLength());
