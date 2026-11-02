@@ -16,6 +16,7 @@ public final class BlockVpn extends VpnService {
  static volatile String status="Stopped";
  private final Object lifecycle=new Object();
  private volatile boolean stopping;
+ private boolean restartRequested;
  private ParcelFileDescriptor tunnel;
  private Thread reader;
  private ThreadPoolExecutor workers;
@@ -25,8 +26,9 @@ public final class BlockVpn extends VpnService {
  private final ThreadLocal<TlsDns> localResolver=new ThreadLocal<>();
 
  @Override public int onStartCommand(Intent intent,int flags,int id){
-  if(intent!=null && "stop".equals(intent.getAction())){shutdown();stopSelf();return START_NOT_STICKY;}
-  if(reader!=null || stopping)return START_NOT_STICKY;
+  if(intent!=null && "stop".equals(intent.getAction())){restartRequested=false;shutdown();stopSelf();return START_NOT_STICKY;}
+  if(stopping){restartRequested=true;status="Restarting…";return START_NOT_STICKY;}
+  if(reader!=null)return START_NOT_STICKY;
   NotificationManager nm=getSystemService(NotificationManager.class);
   nm.createNotificationChannel(new NotificationChannel("blocking","System-wide blocking",NotificationManager.IMPORTANCE_LOW));
   PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,Dashboard.class),PendingIntent.FLAG_IMMUTABLE);
@@ -96,7 +98,7 @@ public final class BlockVpn extends VpnService {
   synchronized(lifecycle){
    if(stopping)return;
    stopping=true;running=false;
-   if(!status.startsWith("Stopped:"))status="Stopped";
+   if(!status.startsWith("Stopped:"))status="Stopping…";
    for(TlsDns resolver:resolvers)resolver.close();resolvers.clear();
    if(tunnel!=null){try{tunnel.close();}catch(IOException ignored){}tunnel=null;}
    output=null;
@@ -105,6 +107,11 @@ public final class BlockVpn extends VpnService {
    Stats.get(this).save();
   }
  }
- @Override public void onRevoke(){shutdown();stopSelf();}
- @Override public void onDestroy(){shutdown();stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();}
+ @Override public void onRevoke(){restartRequested=false;shutdown();stopSelf();}
+ @Override public void onDestroy(){
+  boolean restart=restartRequested;shutdown();
+  if(!status.startsWith("Stopped:"))status="Stopped";
+  stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy();
+  if(restart && VpnService.prepare(this)==null)getApplicationContext().startForegroundService(new Intent(this,BlockVpn.class));
+ }
 }
