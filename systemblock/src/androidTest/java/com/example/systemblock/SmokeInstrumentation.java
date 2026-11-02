@@ -33,7 +33,7 @@ public final class SmokeInstrumentation extends Instrumentation {
      // A different app UID exercises the VPN, avoiding the provider UID's special routing.
      shell("rm -f /sdcard/Android/data/com.obskyra.dnsprobe/files/result.txt");
      shell("am start -W -n com.obskyra.dnsprobe/com.example.dnsprobe.DnsProbe");
-     String report="";long probeDeadline=SystemClock.elapsedRealtime()+45000;
+     String report="";long probeDeadline=SystemClock.elapsedRealtime()+60000;
      while(SystemClock.elapsedRealtime()<probeDeadline){
       report=shell("cat /sdcard/Android/data/com.obskyra.dnsprobe/files/result.txt");
       if(report.contains("PASS:") || report.contains("FAIL:"))break;Thread.sleep(100);

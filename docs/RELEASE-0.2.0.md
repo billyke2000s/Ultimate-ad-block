@@ -15,3 +15,5 @@ This APK is debug-signed for testing. It has no stable production signing/update
 Known limits: occupies Android's VPN slot; not a remote privacy VPN; no same-domain ad removal or interception of app-specific encrypted DNS. Android Private DNS can bypass filtering. Client TCP DNS is not yet supported; oversized UDP replies signal truncation, so clients needing TCP may fail. Do not enable "Block connections without VPN". Counters measure DNS queries, not individual ads or bandwidth saved. Buffered recent statistics can be lost after abrupt process death.
 
 The source and bundled blocklist are included in this repository. See `systemblock/src/main/assets/licenses/` and the blocklist source header for attribution/licences.
+
+DNS-only routing uses Android's `allowBypass()` option: default DNS still uses the virtual resolver, while apps may deliberately select another network. This is not an enforcement/lockdown VPN. The runtime tests require automatic IPv4/IPv6 DNS API queries, ordinary app name resolution and ordinary TCP connectivity as well as an increased local blocked counter.

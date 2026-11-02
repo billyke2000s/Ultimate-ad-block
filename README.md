@@ -34,3 +34,5 @@ GitHub Actions builds an installable debug APK artifact. Debug signing is for te
 
 ## Attribution
 The bundled blocklist is retained from Blockbrowser with source comments: StevenBlack hosts (MIT) and HaGeZi Multi PRO (GPL-3.0). Preserve applicable upstream licences/attribution when redistributing; see blocklist header and original repository docs. Browser-specific history remains in CHANGELOG.md and docs/.
+
+DNS-only routing uses Android's `allowBypass()` option: default DNS still uses the virtual resolver, while apps may deliberately select another network. This is not an enforcement/lockdown VPN. The runtime tests require automatic IPv4/IPv6 DNS API queries, ordinary app name resolution and ordinary TCP connectivity as well as an increased local blocked counter.

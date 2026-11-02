@@ -37,3 +37,5 @@ The new app is module `systemblock`. Gradle also retains `app`, the original bro
 
 ## Unsupported paths
 TCP DNS, direct DoH/DoT interception, general packet forwarding, HTTPS content filtering, certificate installation, same-domain ad removal, and simultaneous use of another VPN app. Android Private DNS and app-specific encrypted DNS may bypass filtering. See STATUS before claiming any implementation works on a device.
+
+DNS-only routing uses Android's `allowBypass()` option: default DNS still uses the virtual resolver, while apps may deliberately select another network. This is not an enforcement/lockdown VPN. The runtime tests require automatic IPv4/IPv6 DNS API queries, ordinary app name resolution and ordinary TCP connectivity as well as an increased local blocked counter.

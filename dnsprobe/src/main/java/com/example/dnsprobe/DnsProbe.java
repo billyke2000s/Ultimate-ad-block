@@ -29,7 +29,11 @@ public final class DnsProbe extends Activity {
    String blocked="probe-"+System.nanoTime()+".doubleclick.net";
    if(lookup(blocked))throw new AssertionError("Blocked domain resolved");
    if(!lookup("example.com"))throw new AssertionError("Allowed domain did not resolve");
-   result="PASS: other-app blocked/allowed Android DNS resolution\n";
+   InetAddress[] normal=InetAddress.getAllByName("example.com");
+   if(normal.length==0)throw new AssertionError("Ordinary app resolution failed");
+   InetAddress address=normal[0];for(InetAddress candidate:normal)if(candidate instanceof Inet4Address){address=candidate;break;}
+   try(Socket socket=new Socket()){socket.connect(new InetSocketAddress(address,443),8000);}
+   result="PASS: other-app blocked/allowed Android DNS, ordinary resolution and TCP connectivity\n";
   }catch(Throwable error){result="FAIL: other-app probe: "+error+"\n";}
   try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getExternalFilesDir(null),"result.txt"))){out.write(result.getBytes(java.nio.charset.StandardCharsets.UTF_8));}
   catch(java.io.IOException error){android.util.Log.e("SystemBlock","Probe result write failed",error);}

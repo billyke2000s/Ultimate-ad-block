@@ -49,7 +49,7 @@ public final class BlockVpn extends VpnService {
     rules=loaded;
     tunnel=new Builder().setSession("System Wide Block Browser").setMtu(1500)
       .addAddress("10.111.0.1",32).addDnsServer("10.111.0.2").addRoute("10.111.0.2",32)
-      .allowFamily(OsConstants.AF_INET6).setBlocking(false).establish();
+      .allowBypass().allowFamily(OsConstants.AF_INET6).setBlocking(false).establish();
     if(tunnel==null)throw new IOException("VPN permission was revoked");
     workers=new ThreadPoolExecutor(4,4,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(64),new ThreadPoolExecutor.AbortPolicy());
     output=new ParcelFileDescriptor.AutoCloseOutputStream(ParcelFileDescriptor.dup(tunnel.getFileDescriptor()));
