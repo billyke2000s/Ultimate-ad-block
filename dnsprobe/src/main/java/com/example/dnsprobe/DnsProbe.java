@@ -8,12 +8,17 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Installed only by CI. Exercises Android's real resolver as a separate app UID. */
-public final class DnsProbe extends Instrumentation {
- @Override public void onCreate(Bundle arguments){super.onCreate(arguments);start();}
- @Override public void onStart(){
-  Bundle result=new Bundle();
+public final class DnsProbe extends Activity {
+ @Override public void onCreate(Bundle arguments){
+  super.onCreate(arguments);android.widget.TextView view=new android.widget.TextView(this);
+  view.setText("Checking cross-app DNS filtering…");setContentView(view);
+  new Thread(this::check,"dns-probe").start();
+ }
+ private void check(){
+  String result;
   try{
-   ConnectivityManager cm=getTargetContext().getSystemService(ConnectivityManager.class);
+   if(checkSelfPermission(android.Manifest.permission.INTERNET)!=android.content.pm.PackageManager.PERMISSION_GRANTED)throw new AssertionError("Probe INTERNET permission missing");
+   ConnectivityManager cm=getSystemService(ConnectivityManager.class);
    long until=SystemClock.elapsedRealtime()+10000;boolean ready=false;
    while(!ready && SystemClock.elapsedRealtime()<until){
     Network network=cm.getActiveNetwork();NetworkCapabilities caps=network==null?null:cm.getNetworkCapabilities(network);
@@ -24,8 +29,11 @@ public final class DnsProbe extends Instrumentation {
    String blocked="probe-"+System.nanoTime()+".doubleclick.net";
    if(lookup(blocked))throw new AssertionError("Blocked domain resolved");
    if(!lookup("example.com"))throw new AssertionError("Allowed domain did not resolve");
-   result.putString("stream","PASS: other-app blocked/allowed Android DNS resolution\n");finish(Activity.RESULT_OK,result);
-  }catch(Throwable error){result.putString("stream","FAIL: other-app probe: "+error+"\n");finish(Activity.RESULT_CANCELED,result);}
+   result="PASS: other-app blocked/allowed Android DNS resolution\n";
+  }catch(Throwable error){result="FAIL: other-app probe: "+error+"\n";}
+  try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getExternalFilesDir(null),"result.txt"))){out.write(result.getBytes(java.nio.charset.StandardCharsets.UTF_8));}
+  catch(java.io.IOException error){android.util.Log.e("SystemBlock","Probe result write failed",error);}
+  runOnUiThread(this::finish);
  }
  private boolean lookup(String host)throws Exception{
   if(Build.VERSION.SDK_INT>=29)return modernLookup(host);

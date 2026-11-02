@@ -31,13 +31,16 @@ public final class SmokeInstrumentation extends Instrumentation {
      Stats before=Stats.get(context);long blockedBefore,allowedBefore;
      synchronized(before){blockedBefore=before.blocked;allowedBefore=before.allowed;}
      // A different app UID exercises the VPN, avoiding the provider UID's special routing.
-     try(java.io.InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation().executeShellCommand("am instrument -w com.obskyra.dnsprobe/com.example.dnsprobe.DnsProbe"))){
-      java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[1024];int n;
-      while((n=in.read(buf))!=-1){if(out.size()+n>65536)throw new AssertionError("Probe output too large");out.write(buf,0,n);}
-      String report=new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);
-      if(!report.contains("PASS: other-app") || report.contains("FAIL:"))throw new AssertionError(report);
-      synchronized(before){if(before.blocked<=blockedBefore || before.allowed<=allowedBefore)throw new AssertionError("Queries did not traverse the local filter");}
+     shell("rm -f /sdcard/Android/data/com.obskyra.dnsprobe/files/result.txt");
+     shell("am start -W -n com.obskyra.dnsprobe/com.example.dnsprobe.DnsProbe");
+     String report="";long probeDeadline=SystemClock.elapsedRealtime()+45000;
+     while(SystemClock.elapsedRealtime()<probeDeadline){
+      report=shell("cat /sdcard/Android/data/com.obskyra.dnsprobe/files/result.txt");
+      if(report.contains("PASS:") || report.contains("FAIL:"))break;Thread.sleep(100);
      }
+     if(!report.contains("PASS: other-app") || report.contains("FAIL:"))throw new AssertionError(report);
+     synchronized(before){if(before.blocked<=blockedBefore || before.allowed<=allowedBefore)throw new AssertionError("Queries did not traverse the local filter");}
+     getUiAutomation().waitForIdle(1000,10000);
     }
     context.startService(new Intent(context,BlockVpn.class).setAction("stop"));await(false);
    }
@@ -56,6 +59,13 @@ public final class SmokeInstrumentation extends Instrumentation {
    context.startService(new Intent(context,BlockVpn.class).setAction("stop"));
    Stats stats=Stats.get(context);
    result.putString("stream","FAIL: "+error+"; state="+failureState+"; blocked="+stats.blocked+"; allowed="+stats.allowed+"; failed="+stats.failed+"\n");capture();finish(Activity.RESULT_CANCELED,result);
+  }
+ }
+ private String shell(String command)throws Exception{
+  try(java.io.InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation().executeShellCommand(command))){
+   java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[1024];int n;
+   while((n=in.read(buf))!=-1){if(out.size()+n>65536)throw new AssertionError("Shell output too large");out.write(buf,0,n);}
+   return new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);
   }
  }
  private void capture(){
