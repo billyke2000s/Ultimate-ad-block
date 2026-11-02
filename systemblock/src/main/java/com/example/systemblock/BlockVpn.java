@@ -82,7 +82,7 @@ public final class BlockVpn extends VpnService {
    byte[] answer=resolver.resolve(query);
    setUpstreamStatus("Filtering · "+rules.blocked.size()+" domains · encrypted DNS");
    complete(packet,query,DnsPacket.fitUdp(query,answer),(answer[3]&15)==2?-1:0);
-  }catch(IOException e){setUpstreamStatus("DNS upstream unavailable: "+e.getClass().getSimpleName());complete(packet,query,DnsPacket.error(query,2),-1);}
+  }catch(IOException e){android.util.Log.w("SystemBlock","Encrypted resolver connection failed: "+e);setUpstreamStatus("DNS upstream unavailable: "+e.getClass().getSimpleName());complete(packet,query,DnsPacket.error(query,2),-1);}
  }
  private void setUpstreamStatus(String value){synchronized(lifecycle){if(!stopping)status=value;}}
  private void complete(byte[] packet,byte[] query,byte[] answer,int outcome){
