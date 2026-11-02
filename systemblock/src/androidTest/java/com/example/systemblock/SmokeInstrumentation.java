@@ -20,8 +20,10 @@ public final class SmokeInstrumentation extends Instrumentation {
     await(true);
     if(cycle==0){
      // Blocked and ordinary lookups really traverse the TUN and encrypted upstream.
+     System.out.println("SMOKE: blocked lookup; status="+BlockVpn.status);
      byte[] blocked=lookup("doubleclick.net");
      if((blocked[3]&15)!=3)throw new AssertionError("Blocked lookup was not NXDOMAIN");
+     System.out.println("SMOKE: allowed TLS lookup");
      byte[] allowed=lookup("example.com");
      if((allowed[3]&15)!=0 || DnsPacket.u16(allowed,6)==0)throw new AssertionError("Allowed lookup failed");
     }
@@ -39,7 +41,8 @@ public final class SmokeInstrumentation extends Instrumentation {
    finish(Activity.RESULT_OK,result);
   }catch(Throwable error){
    context.stopService(new Intent(context,BlockVpn.class));
-   result.putString("stream","FAIL: "+error+"\n");finish(Activity.RESULT_CANCELED,result);
+   Stats stats=Stats.get(context);
+   result.putString("stream","FAIL: "+error+"; state="+BlockVpn.status+"; blocked="+stats.blocked+"; allowed="+stats.allowed+"; failed="+stats.failed+"\n");finish(Activity.RESULT_CANCELED,result);
   }
  }
  private static void await(boolean expected)throws Exception{
