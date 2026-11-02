@@ -19,12 +19,15 @@ public final class SmokeInstrumentation extends Instrumentation {
     context.startForegroundService(new Intent(context,BlockVpn.class));
     await(true);
     if(cycle==0){
+     Stats before=Stats.get(context);long blockedBefore,allowedBefore;
+     synchronized(before){blockedBefore=before.blocked;allowedBefore=before.allowed;}
      // A different app UID exercises the VPN, avoiding the provider UID's special routing.
      try(java.io.InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation().executeShellCommand("am instrument -w com.obskyra.dnsprobe/com.example.dnsprobe.DnsProbe"))){
       java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[1024];int n;
       while((n=in.read(buf))!=-1){if(out.size()+n>65536)throw new AssertionError("Probe output too large");out.write(buf,0,n);}
       String report=new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);
       if(!report.contains("PASS: other-app") || report.contains("FAIL:"))throw new AssertionError(report);
+      synchronized(before){if(before.blocked<=blockedBefore || before.allowed<=allowedBefore)throw new AssertionError("Queries did not traverse the local filter");}
      }
     }
     context.startService(new Intent(context,BlockVpn.class).setAction("stop"));await(false);
