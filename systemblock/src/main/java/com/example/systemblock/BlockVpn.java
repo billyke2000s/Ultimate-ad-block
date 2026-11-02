@@ -26,7 +26,7 @@ public final class BlockVpn extends VpnService {
  private final ThreadLocal<TlsDns> localResolver=new ThreadLocal<>();
 
  @Override public int onStartCommand(Intent intent,int flags,int id){
-  if(intent!=null && "stop".equals(intent.getAction())){restartRequested=false;shutdown();stopSelf();return START_NOT_STICKY;}
+  if(intent!=null && "stop".equals(intent.getAction())){restartRequested=false;shutdown();return START_NOT_STICKY;}
   if(stopping){restartRequested=true;status="Restarting…";return START_NOT_STICKY;}
   if(reader!=null)return START_NOT_STICKY;
   NotificationManager nm=getSystemService(NotificationManager.class);
@@ -52,26 +52,28 @@ public final class BlockVpn extends VpnService {
       .allowFamily(OsConstants.AF_INET6).setBlocking(false).establish();
     if(tunnel==null)throw new IOException("VPN permission was revoked");
     workers=new ThreadPoolExecutor(4,4,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(64),new ThreadPoolExecutor.AbortPolicy());
-    output=new FileOutputStream(tunnel.getFileDescriptor());
-    input=new FileInputStream(tunnel.getFileDescriptor());
+    output=new ParcelFileDescriptor.AutoCloseOutputStream(ParcelFileDescriptor.dup(tunnel.getFileDescriptor()));
+    input=new ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(tunnel.getFileDescriptor()));
     running=true;status="Filtering · "+rules.blocked.size()+" domains · encrypted DNS";
    }
+   try(FileInputStream owned=input){
    byte[] buffer=new byte[32767];
-   StructPollfd descriptor=new StructPollfd();descriptor.fd=input.getFD();descriptor.events=(short)OsConstants.POLLIN;
+   StructPollfd descriptor=new StructPollfd();descriptor.fd=owned.getFD();descriptor.events=(short)OsConstants.POLLIN;
    while(!stopping){
     // Finite poll + nonblocking TUN: closing a descriptor cannot strand a blocking read.
     if(Os.poll(new StructPollfd[]{descriptor},250)==0)continue;
     if(stopping)break;
     if((descriptor.revents & OsConstants.POLLIN)==0)throw new IOException("Tunnel closed");
-    int n=input.read(buffer);if(n<=0)break;
+    int n=owned.read(buffer);if(n<=0)break;
     byte[] packet=Arrays.copyOf(buffer,n),query=DnsPacket.query(packet,n);
     if(query==null)continue;
     if(rules.blocks(DnsPacket.host(query))){complete(packet,query,DnsPacket.error(query,3),1);continue;}
     try{workers.execute(()->resolve(packet,query));}
     catch(RejectedExecutionException busy){complete(packet,query,DnsPacket.error(query,2),-1);}
    }
+   }
   }catch(Exception e){synchronized(lifecycle){if(!stopping)status="Stopped: "+e.getClass().getSimpleName();}}
-  finally{shutdown();stopSelf();}
+  finally{shutdown();}
  }
  private void resolve(byte[] packet,byte[] query){
   if(stopping)return;
@@ -91,7 +93,7 @@ public final class BlockVpn extends VpnService {
   synchronized(lifecycle){
    if(stopping || output==null)return;
    try{output.write(DnsPacket.reply(packet,answer));Stats.get(this).record(DnsPacket.host(query),outcome);}
-   catch(IOException e){status="Stopped: tunnel write failed";shutdown();stopSelf();}
+   catch(IOException e){status="Stopped: tunnel write failed";shutdown();}
   }
  }
  private void shutdown(){
@@ -99,15 +101,23 @@ public final class BlockVpn extends VpnService {
    if(stopping)return;
    stopping=true;running=false;
    if(!status.startsWith("Stopped:"))status="Stopping…";
-   for(TlsDns resolver:resolvers)resolver.close();resolvers.clear();
+   java.util.List<TlsDns> closing=new ArrayList<>(resolvers);resolvers.clear();
+   if(output!=null)try{output.close();}catch(IOException ignored){}output=null;
    if(tunnel!=null){try{tunnel.close();}catch(IOException ignored){}tunnel=null;}
-   output=null;
-   if(workers!=null)workers.shutdownNow();
-   if(reader!=null && reader!=Thread.currentThread())reader.interrupt();
-   Stats.get(this).save();
+   ThreadPoolExecutor executor=workers;Thread oldReader=reader;
+   if(oldReader!=null && oldReader!=Thread.currentThread())oldReader.interrupt();
+   // TLS close_notify may write to the network on Android 8. Never close TLS on main.
+   new Thread(()->{
+    try{
+     if(executor!=null)executor.shutdownNow();
+     for(TlsDns resolver:closing)try{resolver.close();}catch(RuntimeException e){android.util.Log.w("SystemBlock","Resolver shutdown failed: "+e);}
+     if(oldReader!=null && oldReader!=Thread.currentThread())try{oldReader.join(1000);}catch(InterruptedException e){Thread.currentThread().interrupt();}
+     Stats.get(this).save();
+    }finally{stopSelf();}
+   },"dns-shutdown").start();
   }
  }
- @Override public void onRevoke(){restartRequested=false;shutdown();stopSelf();}
+ @Override public void onRevoke(){restartRequested=false;shutdown();}
  @Override public void onDestroy(){
   boolean restart=restartRequested;shutdown();
   if(!status.startsWith("Stopped:"))status="Stopped";
