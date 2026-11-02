@@ -8,7 +8,7 @@
   <trust-anchors>
    <certificates src="system"/>
    <!-- Android 8 predates this root's adoption; never bypass chain or hostname validation. -->
-   <certificates src="@raw/gts_root_r4"/>
+   <certificates src="@raw/ssl_com_root_ecc"/>
   </trust-anchors>
  </domain-config>
 </network-security-config>

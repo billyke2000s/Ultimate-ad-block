@@ -9,7 +9,7 @@ The new app is module `systemblock`. Gradle also retains `app`, the original bro
 3. A local VPN advertises DNS `10.111.0.2`, owns `10.111.0.1`, routes **only 10.111.0.2/32**, and allows the IPv6 family. Regular traffic is not forwarded by this service.
 4. The tunnel reader passes IPv4 UDP/53 packets to `DnsPacket`. Other packet types are currently ignored.
 5. `DomainRules` checks allow exceptions first, then exact/parent-domain block matches. A blocked query receives NXDOMAIN.
-6. A bounded worker pool forwards allowed queries over protected, reusable DNS-over-HTTPS connections to `1.1.1.1:443`, with certificate/hostname verification for `cloudflare-dns.com`. It validates response ID/opcode/question before returning it. Failure sends SERVFAIL with no plaintext fallback. Responses respect a maximum 1232-byte EDNS UDP budget (512 without EDNS); larger responses signal truncation.
+6. A bounded worker pool forwards allowed queries over protected, reusable DNS-over-HTTPS connections to `1.1.1.1:443` (fallback `1.0.0.1:443`), with certificate/hostname verification for `cloudflare-dns.com`. It validates response ID/opcode/question before returning it. Failure sends SERVFAIL with no plaintext fallback. Responses respect a maximum 1232-byte EDNS UDP budget (512 without EDNS); larger responses signal truncation.
 7. `Stats` records query outcomes and blocked host/day counters; `Dashboard` draws charts and refreshes approximately every 1.5 seconds while resumed.
 
 ## File map
