@@ -14,7 +14,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - run: gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:assembleDebugAndroidTest :systemblock:lintDebug
+      - run: gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:assembleDebugAndroidTest :systemblock:lintDebug :dnsprobe:assembleDebug
       - name: Print lint findings on failure
         if: failure()
         run: cat systemblock/build/reports/lint-results-debug.txt
@@ -31,6 +31,10 @@ jobs:
         with:
           name: instrumentation-apk
           path: systemblock/build/outputs/apk/androidTest/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dns-probe-apk
+          path: dnsprobe/build/outputs/apk/debug/*.apk
   emulator:
     needs: build
     runs-on: ubuntu-latest
@@ -47,6 +51,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: instrumentation-apk
+          path: apks
+      - uses: actions/download-artifact@v4
+        with:
+          name: dns-probe-apk
           path: apks
       - name: Enable KVM
         run: |

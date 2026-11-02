@@ -19,13 +19,13 @@ public final class SmokeInstrumentation extends Instrumentation {
     context.startForegroundService(new Intent(context,BlockVpn.class));
     await(true);
     if(cycle==0){
-     // Blocked and ordinary lookups really traverse the TUN and encrypted upstream.
-     System.out.println("SMOKE: blocked lookup; status="+BlockVpn.status);
-     byte[] blocked=lookup("doubleclick.net");
-     if((blocked[3]&15)!=3)throw new AssertionError("Blocked lookup was not NXDOMAIN");
-     System.out.println("SMOKE: allowed TLS lookup");
-     byte[] allowed=lookup("example.com");
-     if((allowed[3]&15)!=0 || DnsPacket.u16(allowed,6)==0)throw new AssertionError("Allowed lookup failed");
+     // A different app UID exercises the VPN, avoiding the provider UID's special routing.
+     try(java.io.InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation().executeShellCommand("am instrument -w com.obskyra.dnsprobe/com.example.dnsprobe.DnsProbe"))){
+      java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[1024];int n;
+      while((n=in.read(buf))!=-1){if(out.size()+n>65536)throw new AssertionError("Probe output too large");out.write(buf,0,n);}
+      String report=new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);
+      if(!report.contains("PASS: other-app") || report.contains("FAIL:"))throw new AssertionError(report);
+     }
     }
     context.stopService(new Intent(context,BlockVpn.class));await(false);
    }
@@ -55,28 +55,5 @@ public final class SmokeInstrumentation extends Instrumentation {
   long until=SystemClock.elapsedRealtime()+15000;
   while(SystemClock.elapsedRealtime()<until){if(BlockVpn.running==expected && (expected || BlockVpn.status.startsWith("Stopped")))return;Thread.sleep(50);}
   throw new AssertionError("Service state timeout: "+BlockVpn.status);
- }
- private byte[] lookup(String domain)throws Exception{
-  android.net.ConnectivityManager cm=getTargetContext().getSystemService(android.net.ConnectivityManager.class);
-  android.net.Network vpn=null;long until=SystemClock.elapsedRealtime()+10000;
-  while(vpn==null && SystemClock.elapsedRealtime()<until){
-   for(android.net.Network network:cm.getAllNetworks()){
-    android.net.NetworkCapabilities caps=cm.getNetworkCapabilities(network);
-    if(caps!=null && caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)){vpn=network;break;}
-   }
-   if(vpn==null)Thread.sleep(50);
-  }
-  if(vpn==null)throw new AssertionError("VPN network not published");
-  java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();
-  bytes.write(new byte[]{1,2,1,0,0,1,0,0,0,0,0,0});
-  for(String label:domain.split("\\.")){bytes.write(label.length());bytes.write(label.getBytes(java.nio.charset.StandardCharsets.US_ASCII));}
-  bytes.write(new byte[]{0,0,1,0,1});byte[] q=bytes.toByteArray();
-  try(DatagramSocket socket=new DatagramSocket()){
-   vpn.bindSocket(socket);
-   socket.setSoTimeout(12000);socket.connect(InetAddress.getByName("10.111.0.2"),53);
-   socket.send(new DatagramPacket(q,q.length));byte[] buf=new byte[4096];DatagramPacket a=new DatagramPacket(buf,buf.length);socket.receive(a);
-   byte[] answer=java.util.Arrays.copyOf(buf,a.getLength());
-   if(!DnsPacket.validAnswer(q,answer))throw new AssertionError("Invalid DNS answer");return answer;
-  }
  }
 }

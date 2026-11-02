@@ -4,3 +4,6 @@ rootProject.name = "SystemWideBlockBrowser"
 include(":app")
 
 include(":systemblock")
+
+// Test-only APK for cross-app DNS integration checks.
+include(":dnsprobe")

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p smoke-results
+adb install -r -t apks/dnsprobe-debug.apk
 adb install -r apks/systemblock-debug.apk
 adb install -r apks/systemblock-debug-androidTest.apk
 adb shell appops set com.obskyra.systemwideblockbrowser ACTIVATE_VPN allow
