@@ -80,10 +80,11 @@ public final class BlockVpn extends VpnService {
     synchronized(lifecycle){if(stopping)return;resolvers.add(resolver);localResolver.set(resolver);}
    }
    byte[] answer=resolver.resolve(query);
-   if(!stopping)status="Filtering · "+rules.blocked.size()+" domains · encrypted DNS";
+   setUpstreamStatus("Filtering · "+rules.blocked.size()+" domains · encrypted DNS");
    complete(packet,query,DnsPacket.fitUdp(query,answer),(answer[3]&15)==2?-1:0);
-  }catch(IOException e){if(!stopping)status="DNS upstream unavailable: "+e.getClass().getSimpleName();complete(packet,query,DnsPacket.error(query,2),-1);}
+  }catch(IOException e){setUpstreamStatus("DNS upstream unavailable: "+e.getClass().getSimpleName());complete(packet,query,DnsPacket.error(query,2),-1);}
  }
+ private void setUpstreamStatus(String value){synchronized(lifecycle){if(!stopping)status=value;}}
  private void complete(byte[] packet,byte[] query,byte[] answer,int outcome){
   synchronized(lifecycle){
    if(stopping || output==null)return;
