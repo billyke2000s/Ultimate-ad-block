@@ -12,6 +12,15 @@ public final class SmokeInstrumentation extends Instrumentation {
  @Override public void onStart(){
   Bundle result=new Bundle();Context context=getTargetContext();
   try{
+   android.net.ConnectivityManager connectivity=context.getSystemService(android.net.ConnectivityManager.class);
+   long networkDeadline=SystemClock.elapsedRealtime()+60000;boolean online=false;
+   while(!online && SystemClock.elapsedRealtime()<networkDeadline){
+    android.net.Network net=connectivity.getActiveNetwork();
+    android.net.NetworkCapabilities caps=net==null?null:connectivity.getNetworkCapabilities(net);
+    online=caps!=null && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) && !caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN);
+    if(!online)Thread.sleep(250);
+   }
+   if(!online)throw new AssertionError("Emulator internet connection never validated before VPN startup");
    if(VpnService.prepare(context)!=null)throw new AssertionError("VPN consent not granted");
    context.startActivity(new Intent(context,Dashboard.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
    getUiAutomation().waitForIdle(1000,10000);
@@ -43,9 +52,10 @@ public final class SmokeInstrumentation extends Instrumentation {
    result.putString("stream","PASS: blocked DNS, encrypted allowed DNS, repeated start/stop, stop during startup, notification stop action.\n");
    capture();finish(Activity.RESULT_OK,result);
   }catch(Throwable error){
+   String failureState=BlockVpn.status;
    context.startService(new Intent(context,BlockVpn.class).setAction("stop"));
    Stats stats=Stats.get(context);
-   result.putString("stream","FAIL: "+error+"; state="+BlockVpn.status+"; blocked="+stats.blocked+"; allowed="+stats.allowed+"; failed="+stats.failed+"\n");capture();finish(Activity.RESULT_CANCELED,result);
+   result.putString("stream","FAIL: "+error+"; state="+failureState+"; blocked="+stats.blocked+"; allowed="+stats.allowed+"; failed="+stats.failed+"\n");capture();finish(Activity.RESULT_CANCELED,result);
   }
  }
  private void capture(){

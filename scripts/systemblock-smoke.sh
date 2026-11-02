@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p smoke-results
-trap 'adb logcat -d -s AndroidRuntime System.out SystemBlock > smoke-results/logcat.txt' EXIT
+collect_evidence() {
+  adb logcat -d > smoke-results/logcat.txt || true
+  adb shell dumpsys connectivity > smoke-results/connectivity.txt || true
+  adb shell dumpsys netpolicy > smoke-results/netpolicy.txt || true
+  adb shell ip rule > smoke-results/ip-rule.txt || true
+  adb shell ip route show table all > smoke-results/ip-route.txt || true
+}
+trap collect_evidence EXIT
 adb install -r -t apks/dnsprobe-debug.apk
 adb install -r apks/systemblock-debug.apk
 adb install -r apks/systemblock-debug-androidTest.apk
