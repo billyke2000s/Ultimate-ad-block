@@ -38,12 +38,18 @@ public final class SmokeInstrumentation extends Instrumentation {
    context.startForegroundService(new Intent(context,BlockVpn.class));await(true);
    context.startService(new Intent(context,BlockVpn.class).setAction("stop"));await(false);
    result.putString("stream","PASS: blocked DNS, encrypted allowed DNS, repeated start/stop, stop during startup, notification stop action.\n");
-   finish(Activity.RESULT_OK,result);
+   capture();finish(Activity.RESULT_OK,result);
   }catch(Throwable error){
    context.stopService(new Intent(context,BlockVpn.class));
    Stats stats=Stats.get(context);
-   result.putString("stream","FAIL: "+error+"; state="+BlockVpn.status+"; blocked="+stats.blocked+"; allowed="+stats.allowed+"; failed="+stats.failed+"\n");finish(Activity.RESULT_CANCELED,result);
+   result.putString("stream","FAIL: "+error+"; state="+BlockVpn.status+"; blocked="+stats.blocked+"; allowed="+stats.allowed+"; failed="+stats.failed+"\n");capture();finish(Activity.RESULT_CANCELED,result);
   }
+ }
+ private void capture(){
+  try{
+   android.graphics.Bitmap image=getUiAutomation().takeScreenshot();
+   if(image!=null){try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getTargetContext().getExternalFilesDir(null),"dashboard.png"))){image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}image.recycle();}
+  }catch(Exception ignored){}
  }
  private static void await(boolean expected)throws Exception{
   long until=SystemClock.elapsedRealtime()+15000;

@@ -47,7 +47,10 @@ final class TlsDns implements Closeable {
   private final Protector protector;
   ProtectedSockets(Protector protector){this.protector=protector;}
   @Override public Socket createSocket()throws IOException{
-   Socket socket=new Socket();if(!protector.protect(socket)){socket.close();throw new IOException("Socket protection failed");}return socket;
+   Socket socket=new Socket();
+   // Android sockets allocate their kernel descriptor lazily. Create it before protect().
+   socket.setTcpNoDelay(true);
+   if(!protector.protect(socket)){socket.close();throw new IOException("Socket protection failed");}return socket;
   }
   private Socket connect(InetAddress host,int port,InetAddress local,int localPort)throws IOException{
    Socket socket=createSocket();try{if(local!=null)socket.bind(new InetSocketAddress(local,localPort));socket.connect(new InetSocketAddress(host,port),4000);return socket;}
