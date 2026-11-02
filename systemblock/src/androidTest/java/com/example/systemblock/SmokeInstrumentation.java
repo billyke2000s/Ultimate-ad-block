@@ -27,12 +27,12 @@ public final class SmokeInstrumentation extends Instrumentation {
       if(!report.contains("PASS: other-app") || report.contains("FAIL:"))throw new AssertionError(report);
      }
     }
-    context.stopService(new Intent(context,BlockVpn.class));await(false);
+    context.startService(new Intent(context,BlockVpn.class).setAction("stop"));await(false);
    }
    // Stop during startup repeatedly, then ensure service can start cleanly afterwards.
    for(int cycle=0;cycle<3;cycle++){
     context.startForegroundService(new Intent(context,BlockVpn.class));
-    context.stopService(new Intent(context,BlockVpn.class));
+    context.startService(new Intent(context,BlockVpn.class).setAction("stop"));
     SystemClock.sleep(250);await(false);
    }
    context.startForegroundService(new Intent(context,BlockVpn.class));await(true);
@@ -40,7 +40,7 @@ public final class SmokeInstrumentation extends Instrumentation {
    result.putString("stream","PASS: blocked DNS, encrypted allowed DNS, repeated start/stop, stop during startup, notification stop action.\n");
    capture();finish(Activity.RESULT_OK,result);
   }catch(Throwable error){
-   context.stopService(new Intent(context,BlockVpn.class));
+   context.startService(new Intent(context,BlockVpn.class).setAction("stop"));
    Stats stats=Stats.get(context);
    result.putString("stream","FAIL: "+error+"; state="+BlockVpn.status+"; blocked="+stats.blocked+"; allowed="+stats.allowed+"; failed="+stats.failed+"\n");capture();finish(Activity.RESULT_CANCELED,result);
   }

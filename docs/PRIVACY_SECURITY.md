@@ -17,3 +17,8 @@ Packets, blocklists, resolver answers, issue text, web pages and downloaded docu
 
 ## Disclosure
 For a vulnerability, report affected code, reproducible minimal synthetic input, impact and proposed fix without leaking user data. If the repository has no private reporting channel, do not claim one exists. For a suspected exposed secret, stop further exposure and tell the owner; do not paste it into an issue or document.
+
+## Android 8 resolver certificate compatibility
+The app trusts system certificate authorities. For `cloudflare-dns.com` only, the network security configuration additionally trusts the public Google Trust Services GTS Root R4 certificate bundled from the host's Mozilla CA package. This fixes the reproduced Android 8 "Trust anchor for certification path not found" failure without disabling TLS chain/hostname validation or installing a device-wide CA.
+
+Certificate SHA-256: `349dfa4058c5e263123b398ae795573c4e1313c83fe68f93556cd5e8031b3c7d`. Valid until 2036-06-22. Reference: https://pki.goog/repository/ . Review this scoped anchor during dependency/resolver maintenance; do not replace it with a leaf certificate or an unverified downloaded CA.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+ <base-config cleartextTrafficPermitted="false">
+  <trust-anchors><certificates src="system"/></trust-anchors>
+ </base-config>
+ <domain-config cleartextTrafficPermitted="false">
+  <domain includeSubdomains="false">cloudflare-dns.com</domain>
+  <trust-anchors>
+   <certificates src="system"/>
+   <!-- Android 8 predates this root's adoption; never bypass chain or hostname validation. -->
+   <certificates src="@raw/gts_root_r4"/>
+  </trust-anchors>
+ </domain-config>
+</network-security-config>

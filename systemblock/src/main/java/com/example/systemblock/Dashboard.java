@@ -18,7 +18,7 @@ public final class Dashboard extends Activity {
  void show(){ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setFitsSystemWindows(true);root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(22),dp(24),dp(22),dp(24));root.setBackgroundColor(0xff101a29);scroll.addView(root);setContentView(scroll);
   text("SYSTEM WIDE BLOCK BROWSER",12).setTextColor(0xff7bcfff);text("Your device. Fewer ads.",28);state=text("Stopped",17);
   button("Start protection",()->{Intent consent=VpnService.prepare(this);if(consent!=null)startActivityForResult(consent,1);else start();});
-  button("Stop protection",()->stopService(new Intent(this,BlockVpn.class)));
+  button("Stop protection",()->startService(new Intent(this,BlockVpn.class).setAction("stop")));
   totals=text("",19);
   Spinner types=new Spinner(this);types.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Pie · DNS outcomes","Doughnut · DNS outcomes","Bars · top blocked domains","Line · last 7 days"}));root.addView(types);
   chart=new Chart();root.addView(chart,new LinearLayout.LayoutParams(-1,dp(260)));
