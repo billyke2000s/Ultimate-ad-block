@@ -2,7 +2,7 @@
 
 ## Current data handling
 - Local VPN inspects DNS queries sent to its virtual resolver; normal internet traffic goes directly to destinations.
-- Allowed DNS queries are forwarded to Cloudflare `1.1.1.1:53` using unencrypted UDP. The resolver/network can observe these queries. This app is not a privacy VPN.
+- Allowed DNS queries are forwarded to Cloudflare `1.1.1.1:853` using DNS over TLS, verified against `cloudflare-dns.com`. The resolver can observe queries; TLS protects their contents on the network. There is no plaintext fallback. This app is not a privacy VPN.
 - Blocked domain names/counts and daily totals are stored locally, bounded to 200 domains/90 days, alongside lifetime outcome counters. Exceptions are also stored locally.
 - No analytics/query-history upload service is implemented. Manifest disables application backup. Do not overclaim immunity to a compromised/rooted device.
 - Domain names may reveal sensitive activity even without full URLs. Treat logs, screenshots and exported stats as private.

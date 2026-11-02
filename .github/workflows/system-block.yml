@@ -14,11 +14,73 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - run: gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:lintDebug
+      - run: gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:assembleDebugAndroidTest :systemblock:lintDebug
       - name: Print lint findings on failure
         if: failure()
         run: cat systemblock/build/reports/lint-results-debug.txt
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-reports
+          path: systemblock/build/reports/
+      - uses: actions/upload-artifact@v4
         with:
           name: System-Wide-Block-Browser-debug
           path: systemblock/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: instrumentation-apk
+          path: systemblock/build/outputs/apk/androidTest/debug/*.apk
+  emulator:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [26, 35]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: System-Wide-Block-Browser-debug
+          path: apks
+      - uses: actions/download-artifact@v4
+        with:
+          name: instrumentation-apk
+          path: apks
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash scripts/systemblock-smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-${{ matrix.api }}-evidence
+          path: smoke-results/
+  release:
+    needs: [build, emulator]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release v0.2.0]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: System-Wide-Block-Browser-debug
+          path: apks
+      - name: Publish testing prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp apks/systemblock-debug.apk System-Wide-Block-Browser-v0.2.0.apk
+          sha256sum System-Wide-Block-Browser-v0.2.0.apk > SHA256SUMS.txt
+          gh release create v0.2.0 System-Wide-Block-Browser-v0.2.0.apk SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "System Wide Block Browser 0.2.0 — testing preview" --notes-file docs/RELEASE-0.2.0.md

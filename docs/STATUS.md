@@ -12,14 +12,22 @@ A separate app based on Blockbrowser's ad blocking, filtering across Android app
 | VPN start/stop, consent, notification | Implemented / unverified | `Dashboard`, `BlockVpn`; no device test |
 | DNS parser/reply framing | Core checks passed | Four core methods ran on Java 17 compiler/runtime; not complete DNS coverage |
 | Domain matching and exceptions | Core checks passed | Exact/parent/lookalike/allowance cases in CoreTest |
-| UDP upstream forwarding | Implemented / unverified | Protected sockets to 1.1.1.1; no on-device connectivity evidence |
+| Encrypted upstream forwarding | Implemented / verification pending | Protected TLS sockets to Cloudflare; new integration tests pending |
 | Pie, doughnut, bars, daily line | Implemented / unverified | Dashboard source; no rendered Android UI check |
 | Local counters/reset/persistence | Implemented / unverified | Stats source; process/lifecycle tests pending |
 | Android build, lint, JUnit Gradle task | CI verified | All three Gradle tasks passed on commit `cbf5e3e50e00d4fe5f0b68ed11f26d20381b5f6c`; see run below |
 | Cross-AI guidance | Implemented | Root/scoped AGENTS, model entry files and docs |
 | APK release | Debug testing artifact available; no production release | CI uploaded `System-Wide-Block-Browser-debug`; device verification and stable signing remain pending |
 
-## Latest CI evidence
+## 0.2.0 reliability work (verification pending)
+- Encrypted Cloudflare upstream via reusable, protected TLS sockets with endpoint verification, timeouts and no plaintext fallback.
+- Shared lifecycle lock prevents tunnel publication after stop; stop/revoke closes TLS connections and workers.
+- EDNS-compatible question validation, clean synthetic DNS errors, bounds checks and UDP truncation budgets.
+- Restored statistics are capped; chart accessibility text/day labels improved; unsupported always-on mode disabled.
+- Added regression tests and Android 8/15 emulator integration jobs. No passing result is claimed for this revision until CI completes.
+- Testing release v0.2.0 is gated on all checks; debug signing and client TCP DNS remain explicit limitations.
+
+## Previous CI evidence (before 0.2.0 changes)
 - Verified commit: `cbf5e3e50e00d4fe5f0b68ed11f26d20381b5f6c`.
 - Successful run: https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41539086946
 - Passed: `:systemblock:testDebugUnitTest`, `:systemblock:assembleDebug`, `:systemblock:lintDebug` (Gradle 8.9 / Java 17).
@@ -43,9 +51,9 @@ A separate app based on Blockbrowser's ad blocking, filtering across Android app
 - Not every ad can be blocked; same-domain ads remain.
 - Private DNS, app-specific DoH/DoT, hard-coded addresses and cached answers can bypass the DNS filter.
 - One VPN app per Android profile. No concurrent privacy VPN or lockdown compatibility.
-- Standard DNS upstream is unencrypted. TCP DNS and encrypted-DNS interception are not implemented.
+- Upstream DNS now uses TLS; port 853 must be reachable. Client TCP DNS and encrypted-DNS interception are not implemented.
 - Per-app statistics, cosmetic filtering, traffic forwarding and bandwidth saving measurements do not exist.
-- Stop/initialization races and large packet handling need further review/runtime coverage. Do not describe these as fixed merely because this document mentions them.
+- Shutdown synchronization and large UDP reply truncation are implemented; new runtime/regression checks must pass before verified claims.
 - Buffered stats may lose the latest increments after abrupt process death; history has retention caps.
 
 ## Handoff discipline
