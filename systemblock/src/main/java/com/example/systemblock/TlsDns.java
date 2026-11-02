@@ -10,14 +10,16 @@ final class TlsDns implements Closeable {
  interface Protector { boolean protect(Socket socket); }
  private final Protector protector;
  private volatile Socket transport;
- private SSLSocket tls;
+ private volatile SSLSocket tls;
  TlsDns(Protector protector) { this.protector=protector; }
  byte[] resolve(byte[] query) throws IOException {
   try {
    if(tls==null || tls.isClosed())connect();
-   DataOutputStream out=new DataOutputStream(tls.getOutputStream());
+   SSLSocket connection=tls;
+   if(connection==null)throw new IOException("Resolver closed");
+   DataOutputStream out=new DataOutputStream(connection.getOutputStream());
    out.writeShort(query.length);out.write(query);out.flush();
-   byte[] answer=readFrame(new DataInputStream(tls.getInputStream()));
+   byte[] answer=readFrame(new DataInputStream(connection.getInputStream()));
    if(!DnsPacket.validAnswer(query,answer))throw new IOException("DNS answer mismatch");
    return answer;
   } catch(IOException e) { close();throw e; }
@@ -40,5 +42,5 @@ final class TlsDns implements Closeable {
   if(length<12)throw new IOException("Invalid DNS frame length");
   byte[] answer=new byte[length];in.readFully(answer);return answer;
  }
- @Override public void close(){Socket raw=transport;transport=null;if(raw!=null)try{raw.close();}catch(IOException ignored){} }
+ @Override public void close(){Socket raw=transport;transport=null;tls=null;if(raw!=null)try{raw.close();}catch(IOException ignored){} }
 }

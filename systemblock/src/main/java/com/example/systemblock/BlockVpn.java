@@ -5,6 +5,8 @@ import android.content.*;
 import android.net.VpnService;
 import android.os.*;
 import android.system.OsConstants;
+import android.system.Os;
+import android.system.StructPollfd;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -45,15 +47,21 @@ public final class BlockVpn extends VpnService {
     rules=loaded;
     tunnel=new Builder().setSession("System Wide Block Browser").setMtu(1500)
       .addAddress("10.111.0.1",32).addDnsServer("10.111.0.2").addRoute("10.111.0.2",32)
-      .allowFamily(OsConstants.AF_INET6).setBlocking(true).establish();
+      .allowFamily(OsConstants.AF_INET6).setBlocking(false).establish();
     if(tunnel==null)throw new IOException("VPN permission was revoked");
     workers=new ThreadPoolExecutor(4,4,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(64),new ThreadPoolExecutor.AbortPolicy());
     output=new FileOutputStream(tunnel.getFileDescriptor());
     input=new FileInputStream(tunnel.getFileDescriptor());
     running=true;status="Filtering · "+rules.blocked.size()+" domains · encrypted DNS";
    }
-   byte[] buffer=new byte[32767];int n;
-   while(!stopping && (n=input.read(buffer))>0){
+   byte[] buffer=new byte[32767];
+   StructPollfd descriptor=new StructPollfd();descriptor.fd=input.getFD();descriptor.events=(short)OsConstants.POLLIN;
+   while(!stopping){
+    // Finite poll + nonblocking TUN: closing a descriptor cannot strand a blocking read.
+    if(Os.poll(new StructPollfd[]{descriptor},250)==0)continue;
+    if(stopping)break;
+    if((descriptor.revents & OsConstants.POLLIN)==0)throw new IOException("Tunnel closed");
+    int n=input.read(buffer);if(n<=0)break;
     byte[] packet=Arrays.copyOf(buffer,n),query=DnsPacket.query(packet,n);
     if(query==null)continue;
     if(rules.blocks(DnsPacket.host(query))){complete(packet,query,DnsPacket.error(query,3),1);continue;}

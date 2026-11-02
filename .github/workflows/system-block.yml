@@ -81,6 +81,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          test "$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/main --jq .object.sha)" = "$GITHUB_SHA"
           cp apks/systemblock-debug.apk System-Wide-Block-Browser-v0.2.0.apk
           sha256sum System-Wide-Block-Browser-v0.2.0.apk > SHA256SUMS.txt
           gh release create v0.2.0 System-Wide-Block-Browser-v0.2.0.apk SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "System Wide Block Browser 0.2.0 — testing preview" --notes-file docs/RELEASE-0.2.0.md
