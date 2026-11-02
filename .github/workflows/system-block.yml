@@ -15,6 +15,9 @@ jobs:
         with:
           gradle-version: '8.9'
       - run: gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:lintDebug
+      - name: Print lint findings on failure
+        if: failure()
+        run: cat systemblock/build/reports/lint-results-debug.txt
       - uses: actions/upload-artifact@v4
         with:
           name: System-Wide-Block-Browser-debug
