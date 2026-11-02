@@ -1,0 +1,126 @@
+name: Build and publish Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # GitHub's Ubuntu runners already ship the Android SDK (ANDROID_HOME).
+      # The third-party android-actions/setup-android step was failing, so we
+      # use the preinstalled SDK and only add the exact platform we compile against.
+      - name: Install Android platform 35
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME" || true
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+
+      # Refresh the bundled ad/tracker list so every build ships the latest version.
+      # If the download fails, the copy committed in the repo is used instead.
+      - name: Update blocklist
+        run: ./scripts/update-blocklist.sh || echo "::warning::Blocklist download failed; building with the committed copy."
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      # Sign with the project's stable key when the repository has it (Settings → Secrets and variables → Actions):
+      # SIGNING_KEYSTORE_BASE64, SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD.
+      # Without it each build gets a throwaway key and phones refuse to update an installed copy.
+      - name: Set up stable signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::warning::Stable signing secrets are not configured. Building with the runner debug key; this APK may not update an existing installation."
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/blockbrowser.jks"
+          {
+            echo "BB_KEYSTORE=$RUNNER_TEMP/blockbrowser.jks"
+            echo "BB_STORE_PASSWORD=$STORE_PASSWORD"
+            echo "BB_KEY_ALIAS=$KEY_ALIAS"
+            echo "BB_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "::notice::Signing with the stable Block Browser key"
+
+      - name: Unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
+
+      # Search suggestions use informal endpoints that can change without notice; report, don't fail.
+      - name: Check search-suggestion endpoints
+        run: ./scripts/check-suggest-endpoints.sh
+
+      - name: Build debug APK
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee build.log
+
+      - name: Upload unit test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Report build failure diagnostics
+        if: failure() && hashFiles('build.log') != '' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo 'Android APK compilation failed. Last 130 lines of the Gradle log:'; echo; echo '\`\`\`'; grep -n -E -C 6 'error:|FAILURE:|What went wrong:|Execution failed|AAPT:|Android resource linking failed' build.log | head -n 140 || true; echo; tail -n 15 build.log; echo '\`\`\`'; } > issue.txt
+          gh issue create --title "Android build failed (run #${{ github.run_number }})" --body-file issue.txt || true
+
+      - name: Show signing certificate
+        run: |
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/35.0.0)/apksigner"
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep -E "SHA-256|DN" | head -2
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlockBrowser-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Publish APK to GitHub Releases
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          if [ -n "${BB_KEYSTORE:-}" ]; then
+            NOTES="Automatic build from commit ${{ github.sha }}, signed with the Block Browser key. Installs over earlier builds signed with the same key."
+          else
+            NOTES="Automatic build from commit ${{ github.sha }}. Signed with a throwaway key: it can't be installed over an existing Block Browser (uninstall first)."
+          fi
+          cp app/build/outputs/apk/debug/app-debug.apk BlockBrowser-debug.apk
+          gh release create "$TAG" BlockBrowser-debug.apk \
+            --title "Block Browser $TAG" \
+            --notes "$NOTES" \
+            --target "${{ github.sha }}"

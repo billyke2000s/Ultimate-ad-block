@@ -1,0 +1,300 @@
+name: UI check on emulator
+
+# Builds the APK, runs it on Android emulators and checks the toolbar position
+# and full-screen mode with scripts/ui-check.sh. Runs on pull requests and can be
+# started manually from the Actions tab. Takes ~10 minutes, so it doesn't run on
+# every push to main.
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ui-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [29, 35]   # Android 10 (older code path) and Android 15 (forced edge-to-edge)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android platform 35
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Enable KVM (hardware acceleration for the emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run UI check on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: ./scripts/ui-check.sh
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-check-api-${{ matrix.api-level }}
+          path: ui-check-output/
+          if-no-files-found: warn
+
+  # Private-browsing isolation: logs in to a local test site in normal and private windows and checks that
+  # cookies, localStorage and IndexedDB are never shared and are deleted after closing, killing or force-stopping.
+  private-isolation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [28, 34, 35]   # Android 9 (oldest with isolated private profiles), 14 and 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android platform 35
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build test APK (uitest variant)
+        run: gradle --no-daemon :app:assembleUitest
+
+      - name: Enable KVM (hardware acceleration for the emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run private isolation check on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: ./scripts/private-isolation-check.sh
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: private-isolation-api-${{ matrix.api-level }}
+          path: isolation-output/
+          if-no-files-found: warn
+
+  # Tabs, session restore, suggestions, downloads, permissions, full screen, clearing data, renderer crash.
+  browser-check:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # push the screen tour to the ci-screenshots branch
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [28, 34, 35]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android platform 35
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build test APK (uitest variant)
+        run: gradle --no-daemon :app:assembleUitest
+
+      - name: Enable KVM (hardware acceleration for the emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run browser check on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          profile: pixel_6
+          script: ./scripts/browser-check.sh
+
+      # Screenshots of every screen, pushed to the "ci-screenshots" branch so they can be reviewed without
+      # downloading artifacts (folder per commit and Android version; older ones are replaced).
+      - name: Publish screen tour
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          dir="$RUNNER_TEMP/shots"; rm -rf "$dir"; mkdir -p "$dir/api-${{ matrix.api-level }}"
+          cp browser-check-output/tour/*.png "$dir/api-${{ matrix.api-level }}/" 2>/dev/null || true
+          cp browser-check-output/*.png browser-check-output/*.md browser-check-output/*.txt "$dir/api-${{ matrix.api-level }}/" 2>/dev/null || true
+          # Keep the device log small enough for git: the app's own lines plus crashes and system errors.
+          if [ -f browser-check-output/logcat.txt ]; then
+            grep -E "blockbrowser|BlockBrowser|chromium|cr_|FATAL|AndroidRuntime|ANR|Fatal signal|lowmemorykiller|DEBUG|libc|WebView|ActivityManager|ActivityTaskManager|SurfaceFlinger" browser-check-output/logcat.txt | tail -n 20000 > "$dir/api-${{ matrix.api-level }}/logcat-filtered.txt" || true
+            tail -n 3000 browser-check-output/logcat.txt > "$dir/api-${{ matrix.api-level }}/logcat-tail.txt" || true
+            rm -f "$dir/api-${{ matrix.api-level }}/logcat.txt"
+          fi
+          echo "Commit $SHA" > "$dir/README.md"
+          cd "$dir" && git init -q && git checkout -q -b ci-screenshots-api-${{ matrix.api-level }}
+          git -c user.name=ci -c user.email=ci@localhost add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -q -m "Screens for $SHA"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" ci-screenshots-api-${{ matrix.api-level }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-check-api-${{ matrix.api-level }}
+          path: browser-check-output/
+          if-no-files-found: warn
+
+  # Video-stream (HLS) downloads: test streams made with ffmpeg, served locally, downloaded by the app and the
+  # resulting MP4s checked with ffprobe. Android 9 (old storage rules) and 15 (notification permission, FGS rules).
+  stream-download-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [28, 35]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android platform 35
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build test APK (uitest variant)
+        run: gradle --no-daemon :app:assembleUitest
+
+      - name: Install ffmpeg and make test streams
+        run: |
+          command -v ffmpeg >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q ffmpeg; }
+          ./scripts/make-test-streams.sh "$PWD/stream-test-files"
+
+      - name: Enable KVM (hardware acceleration for the emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run stream download check on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          profile: pixel_6
+          script: ./scripts/stream-download-check.sh
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stream-download-api-${{ matrix.api-level }}
+          path: stream-check-output/
+          if-no-files-found: warn
+
+  # Posts every Android version's results as one PR comment, updated on each run.
+  isolation-report:
+    needs: [private-isolation, browser-check, stream-download-check]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-api-*'
+          path: results
+      - name: Post or update PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          MARKER='<!-- private-isolation-report -->'
+          {
+            echo "$MARKER"
+            echo "## Emulator test results"
+            echo "Commit ${{ github.event.pull_request.head.sha }} · [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo
+            found=0
+            for f in results/private-isolation-*/summary.md results/browser-check-*/summary.md results/stream-download-*/summary.md; do [ -f "$f" ] || continue; found=1; cat "$f"; echo; done
+            [ "$found" = 1 ] || echo "No results were produced. Check the emulator jobs."
+          } > comment.md
+          ID=$(gh api "repos/$REPO/issues/$PR/comments?per_page=100" --jq "[.[]|select(.body|startswith(\"$MARKER\"))][0].id // empty")
+          if [ -n "$ID" ]; then gh api -X PATCH "repos/$REPO/issues/comments/$ID" -F body=@comment.md >/dev/null
+          else gh api "repos/$REPO/issues/$PR/comments" -F body=@comment.md >/dev/null; fi
