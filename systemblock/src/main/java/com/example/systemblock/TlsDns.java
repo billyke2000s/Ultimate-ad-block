@@ -16,7 +16,9 @@ final class TlsDns implements Closeable {
  TlsDns(Protector protector){
   client=new OkHttpClient.Builder()
    .socketFactory(new ProtectedSockets(protector))
-   .dns(host->Collections.singletonList(InetAddress.getByAddress(new byte[]{1,1,1,1})))
+   .dns(host->java.util.Arrays.asList(
+     InetAddress.getByAddress(new byte[]{1,1,1,1}),
+     InetAddress.getByAddress(new byte[]{1,0,0,1})))
    .connectTimeout(4,TimeUnit.SECONDS).readTimeout(4,TimeUnit.SECONDS).callTimeout(8,TimeUnit.SECONDS)
    .followRedirects(false).followSslRedirects(false)
    .build();

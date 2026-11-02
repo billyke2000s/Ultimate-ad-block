@@ -14,6 +14,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Diagnose public resolver certificate chain
+        run: |
+          mkdir -p systemblock/build/reports
+          timeout 15 openssl s_client -connect 1.1.1.1:443 -servername cloudflare-dns.com -showcerts </dev/null > systemblock/build/reports/resolver-chain.txt 2>&1 || true
+          cat systemblock/build/reports/resolver-chain.txt
       - run: gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:assembleDebugAndroidTest :systemblock:lintDebug :dnsprobe:assembleDebug
       - name: Print lint findings on failure
         if: failure()
