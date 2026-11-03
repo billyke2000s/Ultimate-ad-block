@@ -46,6 +46,12 @@ Product: **System Wide Block Browser**. Published **v0.2.0 testing prerelease**.
 - Counters are buffered; abrupt process death may lose recent increments. History is capped at 200 domains / 90 days.
 - Debug-signed builds are testing artifacts. Installing over an older differently signed build can fail; uninstalling erases settings/statistics.
 
+## README and installation report — 2026-11-03
+- Redesigned README with an original Snake-inspired animated banner, source renderer, project navigation and explicit verification boundaries.
+- Removed the inaccurate ransomware feature sentence from the README; no application behavior changed.
+- User supplied a screenshot of Google Play Protect blocking the v0.2.0 APK as harmful. Cause and classification remain unresolved. Do not claim the APK is cleared or recommend bypassing the warning.
+- This report concerns installation; full physical-device runtime testing remains pending.
+
 ## Next work
 1. Run the remaining physical-device matrix in VERIFICATION; record models, Android versions, APK hash and exact cases.
 2. Implement and test client TCP DNS before broad DNS interoperability claims.
