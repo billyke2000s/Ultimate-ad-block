@@ -1,9 +1,20 @@
 # Current state — read before work
 
 Updated: 2026-11-03. Repository: `billyke2000s/Ultimate-ad-block`.
-Product: **System Wide Block Browser**. Published **v0.3.0 testing prerelease**.
+Product: **System Wide Block Browser**. Published **v0.4.0 testing prerelease**.
 
-## Verified v0.3.0 release
+## Verified v0.4.0 release
+- Release: https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.4.0
+- Source: `ef5adc05b06dd742559c05ea0f7cb9699efb04b8`.
+- Successful CI: https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41579642400
+- 19 unit tests passed; lint 0 errors, 8 warnings; Android assembly passed.
+- Both API 26/35 emulator suites passed: real cross-app blocked/allowed DNS, ordinary TCP, lifecycle cases, overview chart/tab visibility without scrolling, chart selection, allowed/blocked/failed activity filtering and search.
+- Isolated Android persistence checks passed for save/reload, recording disabled and clearing history without resetting totals.
+- Actual API 35 overview, bars, domain filters and Settings captures inspected. Screenshot counters are actual synthetic probe traffic, not production fixtures.
+- APK SHA-256: `e92965d080215f971f785514573bbb7c340af7b37c256ad45806b596a883e3df`.
+- Physical-device/font-scale/accessibility matrix and the previously reported Play Protect classification remain unresolved. This release changes UI and local query retention, not Play Protect status.
+
+## Previous verified v0.3.0 release
 - Release: https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.3.0
 - APK: https://github.com/billyke2000s/Ultimate-ad-block/releases/download/v0.3.0/System-Wide-Block-Browser-v0.3.0.apk
 - Source: `e0970d2a9b1e702fc8dfb0c7517c02606d275864`.
@@ -77,7 +88,7 @@ Product: **System Wide Block Browser**. Published **v0.3.0 testing prerelease**.
 - User explicitly requested visibility of allowed and blocked domains. Recent allowed/failed names and timestamps are now stored locally as well as blocked records. Settings disclose this, allow recording to be disabled and activity to be cleared without clearing totals.
 - Existing counters, daily history, exceptions, package identity and DNS routing are preserved. No per-app identity is claimed.
 - Native alert dialogs now use the app palette; Settings is a full page.
-- Build/unit/lint/emulator verification pending for this revision; no new result claimed yet.
+- Build, 19 unit tests, lint and API 26/35 emulator checks passed. v0.4.0 is published; see verified release above.
 
 ## Next work
 1. Run the remaining physical-device matrix in VERIFICATION; record models, Android versions, APK hash and exact cases.

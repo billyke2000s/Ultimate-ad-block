@@ -10,12 +10,12 @@
 <p align="center">
   <a href="https://github.com/billyke2000s/Ultimate-ad-block/actions/workflows/system-block.yml"><img src="https://github.com/billyke2000s/Ultimate-ad-block/actions/workflows/system-block.yml/badge.svg" alt="Android build status" /></a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-afbf8b?style=flat-square&labelColor=162f20" alt="Android 8.0 and later" />
-  <img src="https://img.shields.io/badge/release-0.3.0%20preview-afbf8b?style=flat-square&labelColor=162f20" alt="Version 0.3.0 testing preview" />
+  <img src="https://img.shields.io/badge/release-0.4.0%20preview-afbf8b?style=flat-square&labelColor=162f20" alt="Version 0.4.0 testing preview" />
   <img src="https://img.shields.io/badge/DNS-HTTPS-afbf8b?style=flat-square&labelColor=162f20" alt="DNS over HTTPS" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.3.0"><strong>Release & APK</strong></a>
+  <a href="https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.4.0"><strong>Release & APK</strong></a>
   &nbsp; / &nbsp;
   <a href="docs/ARCHITECTURE.md">Architecture</a>
   &nbsp; / &nbsp;
@@ -38,9 +38,10 @@ Built from the domain list used by [Blockbrowser](https://github.com/billyke2000
 | :--- | :--- |
 | **Local domain filtering** | Bundles 215,000+ ad and tracker domain rules, with parent-domain matching. |
 | **Encrypted upstream DNS** | Resolves allowed queries through certificate-verified Cloudflare DNS over HTTPS, with no plaintext fallback. |
-| **Four views of activity** | Pie, doughnut, top-domain bars and a seven-day activity line. |
+| **Compact overview** | Fixed bottom navigation and four chart selectors that fit across the screen: pie, ring, bars and week. |
+| **Visible domain activity** | Search the latest 200 DNS queries and filter by blocked, allowed or failed, with per-query times and an allow-domain action. |
 | **Exceptions you control** | Allow a domain and its subdomains; restart protection to apply the change. |
-| **On-device statistics** | Saves query totals locally, with up to 200 domain entries and 90 days of daily history. |
+| **On-device statistics** | Preserves totals, up to 200 blocked-domain counters, 90 daily entries and the newest 200 queries. Turn activity recording off or clear its history in Settings. |
 | **Visible controls** | User-approved VPN consent, start/stop controls and a foreground notification with Stop. |
 
 **The counters measure DNS queries.** They do not measure individual ads, per-app activity or bandwidth saved.
@@ -48,12 +49,16 @@ Built from the domain list used by [Blockbrowser](https://github.com/billyke2000
 ## Inside the app
 
 <p align="center">
-  <img src="docs/screenshots/systemblock-active.png" width="300" alt="Android dashboard with a green protection card, one pause control and three query counters." />
+  <img src="docs/screenshots/systemblock-active.png" width="260" alt="Compact overview with protection controls, query totals, all four chart selectors and fixed bottom navigation." />
   &nbsp;
-  <img src="docs/screenshots/systemblock-ring.png" width="300" alt="Ring chart with real blocked and allowed query proportions from an emulator test." />
+  <img src="docs/screenshots/systemblock-blocked.png" width="260" alt="Activity screen showing actual blocked domain names, query times, search and outcome filters." />
+  &nbsp;
+  <img src="docs/screenshots/systemblock-settings.png" width="260" alt="Settings page with exception controls, recording toggle and local history controls." />
 </p>
 
-<p align="center"><sub>Actual v0.3.0 Android 15 emulator captures. Counters come from synthetic DNS test traffic.</sub></p>
+<p align="center"><sub>Actual v0.4.0 Android 15 emulator captures. Queries are synthetic test traffic.</sub></p>
+
+Activity history begins with this version; older totals do not contain past allowed-domain names. Recent activity is stored locally and can be disabled or cleared independently of the totals.
 
 ## Under the pixels
 
@@ -76,14 +81,14 @@ The upstream resolver can see allowed DNS queries. No analytics or query-history
 
 | Area | Evidence |
 | :--- | :--- |
-| Build, unit tests and lint | [Successful v0.3.0 workflow](https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41576934215); 15 unit tests; lint: 0 errors, 8 warnings. |
+| Build, unit tests and lint | [Successful v0.4.0 workflow](https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41579642400); 19 unit tests; lint: 0 errors, 8 warnings. |
 | Cross-app DNS and ordinary connectivity | Exercised by a separate probe app on Android 8 / API 26 and Android 15 / API 35 emulators. |
 | Service lifecycle | Named start/stop cases exercised in emulator CI. |
-| Charts | Four selectors exercised in emulator CI; dashboard and chart screenshots inspected. Full accessibility and physical-device review remains pending. |
+| Charts | Overview visibility, four selectors, activity filters and search exercised in emulator CI; actual captures inspected. Full accessibility and physical-device review remains pending. |
 | Physical devices | Full runtime test matrix remains pending; see the status document for device reports. |
 | Distribution | Debug-signed testing prerelease; stable production signing and update compatibility remain pending. |
 
-Source for the published APK: [`e0970d2`](https://github.com/billyke2000s/Ultimate-ad-block/commit/e0970d2a9b1e702fc8dfb0c7517c02606d275864). Detailed evidence and remaining work live in [STATUS](docs/STATUS.md).
+Source for the published APK: [`ef5adc0`](https://github.com/billyke2000s/Ultimate-ad-block/commit/ef5adc05b06dd742559c05ea0f7cb9699efb04b8). Detailed evidence and remaining work live in [STATUS](docs/STATUS.md).
 
 ## Know the edges
 
