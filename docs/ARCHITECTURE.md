@@ -1,7 +1,7 @@
 # Architecture and code map
 
 ## Product boundary
-The new app is module `systemblock`. Gradle also retains `app`, the original browser copy. New APKs use `com.obskyra.systemwideblockbrowser`; Java sources use `com.example.systemblock`. The current build workflow targets only systemblock.
+The new app is module `systemblock`. Gradle also retains `app`, the original browser copy. New APKs use `com.obskyra.systemwideblockbrowser`; Java sources use `com.example.systemblock`. The delivered APK targets systemblock; the workflow also builds dnsprobe as a CI-only normal app for cross-app DNS/TCP verification.
 
 ## Data flow
 1. `Dashboard.java` calls VpnService.prepare and starts `BlockVpn` only after system consent.
@@ -39,3 +39,6 @@ The new app is module `systemblock`. Gradle also retains `app`, the original bro
 TCP DNS, direct DoH/DoT interception, general packet forwarding, HTTPS content filtering, certificate installation, same-domain ad removal, and simultaneous use of another VPN app. Android Private DNS and app-specific encrypted DNS may bypass filtering. See STATUS before claiming any implementation works on a device.
 
 DNS-only routing uses Android's `allowBypass()` option: default DNS still uses the virtual resolver, while apps may deliberately select another network. This is not an enforcement/lockdown VPN. The runtime tests require automatic IPv4/IPv6 DNS API queries, ordinary app name resolution and ordinary TCP connectivity as well as an increased local blocked counter.
+
+## Verified lifecycle ownership
+Tunnel input/output each own duplicated ParcelFileDescriptors. The reader polls with a bounded timeout. Shutdown publishes stopping under the lifecycle lock, closes tunnel/output, interrupts the reader and closes TLS/worker resources on a background cleanup thread before normal service destruction. Dashboard and notification Stop both use an explicit stop action; service destruction updates stopped status. API 26/35 emulator cases are linked in STATUS.

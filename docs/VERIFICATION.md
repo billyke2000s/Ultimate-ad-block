@@ -21,7 +21,9 @@ gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :sy
 git diff --check
 ```
 
-The GitHub workflow performs those module checks and uploads a debug APK. Record the run URL, exact commit SHA and outcomes in STATUS. If CI fails, inspect actual logs; do not remove lint/tests or add broad suppressions to get green checks.
+The GitHub workflow performs those module checks, builds the test APK and dnsprobe, then runs cross-app DNS/ordinary TCP and lifecycle checks on API 26/35 emulators before publishing a marked testing prerelease. Record the run URL, exact commit SHA and outcomes in STATUS. If CI fails, inspect actual logs; do not remove lint/tests or add broad suppressions to get green checks.
+
+`CoreTest` plus `DnsRobustnessTest` now contain 15 passing Gradle/JUnit tests. They cover EDNS omission, packet bounds/opcode/question mismatch, UDP truncation budgets and bounded/fragmented encrypted bodies in addition to the original core checks.
 
 `CoreTest` covers domain suffix/allowance matching, malformed DNS rejection, DNS answer association, IPv4/UDP framing and IPv4 header checksum. These four methods do not cover Android APIs, complete DNS interoperability, concurrency, UI or persistence.
 
@@ -50,3 +52,7 @@ Never enable lockdown for this DNS-only design. TCP DNS and large/truncated/EDNS
 - Chart clipping/accessibility, configuration changes and concurrent stats reset.
 
 A release requires a successful Android build/lint/test run, passing critical runtime cases and an explicit list of remaining limitations. Do not invent a physical device result when only an emulator is available.
+
+## Verified v0.2.0 baseline
+Release source `042ab7a5d9dbd29b82bc452fb2a50252d3b362a9`: https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41549297575
+Both API 26/35 emulator jobs passed. The CI-only dnsprobe runs as a normal foreground app with a distinct UID and uses Android DNS APIs, ordinary name resolution and TCP connectivity. The parent test requires increased local blocked/allowed counters. Private DNS is disabled in the emulator test fixture. Physical-device and remaining scenarios above are still pending.
