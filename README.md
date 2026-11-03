@@ -10,12 +10,12 @@
 <p align="center">
   <a href="https://github.com/billyke2000s/Ultimate-ad-block/actions/workflows/system-block.yml"><img src="https://github.com/billyke2000s/Ultimate-ad-block/actions/workflows/system-block.yml/badge.svg" alt="Android build status" /></a>
   <img src="https://img.shields.io/badge/Android-8.0%2B-afbf8b?style=flat-square&labelColor=162f20" alt="Android 8.0 and later" />
-  <img src="https://img.shields.io/badge/release-0.2.0%20preview-afbf8b?style=flat-square&labelColor=162f20" alt="Version 0.2.0 testing preview" />
+  <img src="https://img.shields.io/badge/release-0.3.0%20preview-afbf8b?style=flat-square&labelColor=162f20" alt="Version 0.3.0 testing preview" />
   <img src="https://img.shields.io/badge/DNS-HTTPS-afbf8b?style=flat-square&labelColor=162f20" alt="DNS over HTTPS" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.2.0"><strong>Release & APK</strong></a>
+  <a href="https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.3.0"><strong>Release & APK</strong></a>
   &nbsp; / &nbsp;
   <a href="docs/ARCHITECTURE.md">Architecture</a>
   &nbsp; / &nbsp;
@@ -45,6 +45,16 @@ Built from the domain list used by [Blockbrowser](https://github.com/billyke2000
 
 **The counters measure DNS queries.** They do not measure individual ads, per-app activity or bandwidth saved.
 
+## Inside the app
+
+<p align="center">
+  <img src="docs/screenshots/systemblock-active.png" width="300" alt="Android dashboard with a green protection card, one pause control and three query counters." />
+  &nbsp;
+  <img src="docs/screenshots/systemblock-ring.png" width="300" alt="Ring chart with real blocked and allowed query proportions from an emulator test." />
+</p>
+
+<p align="center"><sub>Actual v0.3.0 Android 15 emulator captures. Counters come from synthetic DNS test traffic.</sub></p>
+
 ## Under the pixels
 
 ```mermaid
@@ -66,14 +76,14 @@ The upstream resolver can see allowed DNS queries. No analytics or query-history
 
 | Area | Evidence |
 | :--- | :--- |
-| Build, unit tests and lint | [Successful v0.2.0 workflow](https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41549297575); 15 unit tests; lint: 0 errors, 6 warnings. |
+| Build, unit tests and lint | [Successful v0.3.0 workflow](https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41576934215); 15 unit tests; lint: 0 errors, 8 warnings. |
 | Cross-app DNS and ordinary connectivity | Exercised by a separate probe app on Android 8 / API 26 and Android 15 / API 35 emulators. |
 | Service lifecycle | Named start/stop cases exercised in emulator CI. |
-| Charts | Implemented; basic dashboard/pie rendering inspected. Full visual and accessibility review remains pending. |
+| Charts | Four selectors exercised in emulator CI; dashboard and chart screenshots inspected. Full accessibility and physical-device review remains pending. |
 | Physical devices | Full runtime test matrix remains pending; see the status document for device reports. |
 | Distribution | Debug-signed testing prerelease; stable production signing and update compatibility remain pending. |
 
-Source for the published APK: [`042ab7a`](https://github.com/billyke2000s/Ultimate-ad-block/commit/042ab7a5d9dbd29b82bc452fb2a50252d3b362a9). Detailed evidence and remaining work live in [STATUS](docs/STATUS.md).
+Source for the published APK: [`e0970d2`](https://github.com/billyke2000s/Ultimate-ad-block/commit/e0970d2a9b1e702fc8dfb0c7517c02606d275864). Detailed evidence and remaining work live in [STATUS](docs/STATUS.md).
 
 ## Know the edges
 

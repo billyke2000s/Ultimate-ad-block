@@ -1,9 +1,19 @@
 # Current state — read before work
 
 Updated: 2026-11-03. Repository: `billyke2000s/Ultimate-ad-block`.
-Product: **System Wide Block Browser**. Published **v0.2.0 testing prerelease**.
+Product: **System Wide Block Browser**. Published **v0.3.0 testing prerelease**.
 
-## Verified release
+## Verified v0.3.0 release
+- Release: https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.3.0
+- APK: https://github.com/billyke2000s/Ultimate-ad-block/releases/download/v0.3.0/System-Wide-Block-Browser-v0.3.0.apk
+- Source: `e0970d2a9b1e702fc8dfb0c7517c02606d275864`.
+- Successful build, unit tests, lint and API 26/35 emulator run: https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41576934215
+- Lint: 0 errors, 8 warnings (target API, backup rules and draw allocations). No checks suppressed.
+- APK SHA-256: `a876d8cd1e4cc1087e6fb1c591ef4011a73d8f4804488dfffb83060d1ace9809`.
+- Active/stopped action state and four chart selectors passed in emulator instrumentation. Actual API 35 dashboard, ring, domain and weekly captures visually inspected; no physical-device/all-font-size accessibility claim.
+- README now includes actual emulator captures, with synthetic test traffic explicitly labelled.
+
+## Previous v0.2.0 baseline
 - Release: https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.2.0
 - APK: https://github.com/billyke2000s/Ultimate-ad-block/releases/download/v0.2.0/System-Wide-Block-Browser-v0.2.0.apk
 - Verified source commit: `042ab7a5d9dbd29b82bc452fb2a50252d3b362a9`.
@@ -11,7 +21,7 @@ Product: **System Wide Block Browser**. Published **v0.2.0 testing prerelease**.
 - APK SHA-256: `392f9bfb015224ca349641e8a0a94b5d0254b9d1ff98faadec48aaf20965dea1`.
 - The evidence above applies to the immutable v0.2.0 release commit. The dashboard redesign below is tracked separately.
 
-## Implementation and evidence
+## v0.2.0 baseline implementation and evidence
 | Area | Current status | Evidence / limits |
 | --- | --- | --- |
 | Independent package / Android APK | CI verified | Install/build tested on Android 8 API 26 and Android 15 API 35 emulators |
@@ -58,7 +68,7 @@ Product: **System Wide Block Browser**. Published **v0.2.0 testing prerelease**.
 - Added active/stopped action checks, all-mode chart interaction checks and per-mode emulator screenshots to CI.
 - README warning box removed at the user's request. The Play Protect report above remains unresolved; removing presentation copy is not clearance.
 - User screenshots show v0.2.0 running with real blocked/allowed counters on their phone; this is limited observation, not the full device matrix.
-- Validation for the redesigned UI: awaiting CI build, lint, unit tests and API 26/35 emulator results. No new APK is claimed verified yet.
+- Validation for the redesigned UI: build, unit tests, lint and both emulator suites passed; v0.3.0 published. See the verified release section. The earlier Play Protect report remains unresolved.
 
 ## Next work
 1. Run the remaining physical-device matrix in VERIFICATION; record models, Android versions, APK hash and exact cases.
