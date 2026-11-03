@@ -69,11 +69,16 @@ public final class SmokeInstrumentation extends Instrumentation {
   runOnMainSync(()->{
    android.view.View toggle=dashboard.getWindow().getDecorView().findViewWithTag("protection-toggle");
    if(!(toggle instanceof android.widget.Button))throw new AssertionError("Missing protection action");
-   String expected=active?"Pause protection":"Start protection";
+   android.view.View chart=dashboard.getWindow().getDecorView().findViewWithTag("activity-chart");
+   android.graphics.Rect visible=new android.graphics.Rect();
+   if(!chart.getGlobalVisibleRect(visible)||visible.height()!=chart.getHeight())throw new AssertionError("Overview chart needs scrolling");
+   for(int i=0;i<4;i++){android.view.View tab=dashboard.getWindow().getDecorView().findViewWithTag("chart-mode-"+i);if(!tab.getGlobalVisibleRect(visible)||visible.width()!=tab.getWidth())throw new AssertionError("Chart tab clipped");}
+   String expected=active?"Pause":"Start";
    if(!expected.contentEquals(((android.widget.Button)toggle).getText()))throw new AssertionError("Protection action disagrees with service");
   });
   capture(active?"dashboard-active.png":"dashboard-stopped.png");
   if(!active){
+   verifyHistoryPersistence();
    for(int mode=0;mode<4;mode++){
     final int selected=mode;
     runOnMainSync(()->{
@@ -86,7 +91,47 @@ public final class SmokeInstrumentation extends Instrumentation {
     getUiAutomation().waitForIdle(500,5000);
     capture("chart-"+mode+".png");
    }
+   runOnMainSync(()->dashboard.getWindow().getDecorView().findViewWithTag("nav-1").performClick());
+   getUiAutomation().waitForIdle(500,5000);capture("activity-all.png");
+   for(int outcome:new int[]{1,0,-1}){
+    final int selected=outcome;
+    runOnMainSync(()->{
+     dashboard.getWindow().getDecorView().findViewWithTag("filter-"+selected).performClick();
+     android.widget.ListView list=dashboard.getWindow().getDecorView().findViewWithTag("domain-list");
+     java.util.List<QueryLog.Entry> expected=Stats.get(getTargetContext()).activity(selected,"");
+     if(selected!=-1 && expected.isEmpty())throw new AssertionError("Real probe traffic missing from activity");
+     if(list.getAdapter().getCount()!=expected.size())throw new AssertionError("Activity filter count mismatch");
+     for(QueryLog.Entry e:expected)if(e.outcome!=selected)throw new AssertionError("Wrong outcome in filter");
+    });
+    getUiAutomation().waitForIdle(500,5000);capture(outcome==1?"activity-blocked.png":outcome==0?"activity-allowed.png":"activity-failed.png");
+   }
+   runOnMainSync(()->{
+    dashboard.getWindow().getDecorView().findViewWithTag("filter-2").performClick();
+    java.util.List<QueryLog.Entry> entries=Stats.get(getTargetContext()).activity(2,"");
+    String needle=entries.get(0).host.toUpperCase(java.util.Locale.ROOT);
+    ((android.widget.EditText)dashboard.getWindow().getDecorView().findViewWithTag("domain-search")).setText(needle);
+    android.widget.ListView list=dashboard.getWindow().getDecorView().findViewWithTag("domain-list");
+    if(list.getAdapter().getCount()!=Stats.get(getTargetContext()).activity(2,needle).size())throw new AssertionError("Domain search mismatch");
+   });
+   runOnMainSync(()->dashboard.getWindow().getDecorView().findViewWithTag("nav-2").performClick());
+   getUiAutomation().waitForIdle(500,5000);capture("settings.png");
+
   }
+ }
+ private void verifyHistoryPersistence(){
+  Context isolated=new android.content.ContextWrapper(getTargetContext()){
+   @Override public android.content.SharedPreferences getSharedPreferences(String name,int mode){return super.getSharedPreferences("test_history_"+name,mode);}
+  };
+  isolated.getSharedPreferences("dns_stats",0).edit().clear().commit();
+  Stats original=new Stats(isolated);original.record("allowed.example",0);original.record("blocked.example",1);original.record("failed.example",-1);original.save();
+  Stats restored=new Stats(isolated);
+  if(restored.activity(2,"").size()!=3 || restored.activity(0,"ALLOWED").size()!=1)throw new AssertionError("History did not survive reload");
+  restored.setRecording(false);restored.record("private.example",0);restored.save();
+  Stats disabled=new Stats(isolated);
+  if(disabled.isRecording() || !disabled.activity(2,"private").isEmpty())throw new AssertionError("Activity opt-out failed");
+  disabled.clearActivity();Stats cleared=new Stats(isolated);
+  if(!cleared.activity(2,"").isEmpty() || cleared.allowed!=2 || cleared.blocked!=1)throw new AssertionError("Clear history changed totals or retained queries");
+  isolated.getSharedPreferences("dns_stats",0).edit().clear().commit();
  }
  private String shell(String command)throws Exception{
   try(java.io.InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation().executeShellCommand(command))){

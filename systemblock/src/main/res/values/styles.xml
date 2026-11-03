@@ -1,0 +1,22 @@
+<resources>
+ <style name="BlockTheme" parent="android:style/Theme.Material.NoActionBar">
+  <item name="android:fontFamily">sans-serif</item>
+  <item name="android:colorAccent">#91ADFF</item>
+  <item name="android:colorBackground">#0D1016</item>
+  <item name="android:windowBackground">#0D1016</item>
+  <item name="android:textColorPrimary">#F3F5F9</item>
+  <item name="android:textColorSecondary">#919BAD</item>
+  <item name="android:alertDialogTheme">@style/BlockDialog</item>
+  <item name="android:windowActionModeOverlay">true</item>
+ </style>
+ <style name="BlockDialog" parent="android:style/Theme.Material.Dialog.Alert">
+  <item name="android:fontFamily">sans-serif</item>
+  <item name="android:colorAccent">#91ADFF</item>
+  <item name="android:colorBackground">#151A23</item>
+  <item name="android:windowBackground">@drawable/dialog_background</item>
+  <item name="android:textColorPrimary">#F3F5F9</item>
+  <item name="android:textColorSecondary">#919BAD</item>
+  <item name="android:windowMinWidthMajor">90%</item>
+  <item name="android:windowMinWidthMinor">90%</item>
+ </style>
+</resources>

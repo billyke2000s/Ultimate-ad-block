@@ -70,6 +70,15 @@ Product: **System Wide Block Browser**. Published **v0.3.0 testing prerelease**.
 - User screenshots show v0.2.0 running with real blocked/allowed counters on their phone; this is limited observation, not the full device matrix.
 - Validation for the redesigned UI: build, unit tests, lint and both emulator suites passed; v0.3.0 published. See the verified release section. The earlier Play Protect report remains unresolved.
 
+## Compact navigation and query activity — 0.4.0
+- Replaced the tall dashboard with a compact overview and fixed Overview / Activity / Settings navigation.
+- Four chart selectors share the available width. Charts are smaller on short displays; Android tests assert chart and selector visibility without scrolling at default emulator font size.
+- Activity displays the newest 200 actual DNS queries with domain, allowed/blocked/failed result and time, searchable and filterable. Blocked rows offer an explicit allow-domain action; restarting protection still applies exceptions.
+- User explicitly requested visibility of allowed and blocked domains. Recent allowed/failed names and timestamps are now stored locally as well as blocked records. Settings disclose this, allow recording to be disabled and activity to be cleared without clearing totals.
+- Existing counters, daily history, exceptions, package identity and DNS routing are preserved. No per-app identity is claimed.
+- Native alert dialogs now use the app palette; Settings is a full page.
+- Build/unit/lint/emulator verification pending for this revision; no new result claimed yet.
+
 ## Next work
 1. Run the remaining physical-device matrix in VERIFICATION; record models, Android versions, APK hash and exact cases.
 2. Implement and test client TCP DNS before broad DNS interoperability claims.

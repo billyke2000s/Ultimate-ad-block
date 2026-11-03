@@ -42,3 +42,6 @@ DNS-only routing uses Android's `allowBypass()` option: default DNS still uses t
 
 ## Verified lifecycle ownership
 Tunnel input/output each own duplicated ParcelFileDescriptors. The reader polls with a bounded timeout. Shutdown publishes stopping under the lifecycle lock, closes tunnel/output, interrupts the reader and closes TLS/worker resources on a background cleanup thread before normal service destruction. Dashboard and notification Stop both use an explicit stop action; service destruction updates stopped status. API 26/35 emulator cases are linked in STATUS.
+
+## Compact dashboard and activity (0.4.0)
+Dashboard uses fixed Overview / Activity / Settings navigation. Overview retains four compact chart modes; Activity uses a filtered ListView over newest-first snapshots of QueryLog. QueryLog retains at most 200 domain/outcome/time entries. Stats serializes the activity array with the existing JSON counters; old files without the array migrate to an empty log. The record_activity preference controls new entries, not counters. Clear activity preserves totals; Reset statistics clears both. Settings disclose local retention and provide controls. No query history is uploaded or written to system logs. No UI refresh reconstructs the navigation shell.

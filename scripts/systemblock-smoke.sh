@@ -16,7 +16,7 @@ adb shell settings put global private_dns_mode off
 adb shell appops set com.obskyra.systemwideblockbrowser ACTIVATE_VPN allow
 adb shell am instrument -w -r com.obskyra.systemwideblockbrowser.test/com.example.systemblock.SmokeInstrumentation | tee smoke-results/instrumentation.txt
 adb pull /sdcard/Android/data/com.obskyra.systemwideblockbrowser/files/dashboard.png smoke-results/dashboard.png || true
-for image in dashboard-active dashboard-stopped chart-0 chart-1 chart-2 chart-3; do
+for image in dashboard-active dashboard-stopped chart-0 chart-1 chart-2 chart-3 activity-all activity-blocked activity-allowed activity-failed settings; do
   adb pull "/sdcard/Android/data/com.obskyra.systemwideblockbrowser/files/$image.png" "smoke-results/$image.png"
 done
 adb logcat -d -s AndroidRuntime System.out SystemBlock > smoke-results/logcat.txt
