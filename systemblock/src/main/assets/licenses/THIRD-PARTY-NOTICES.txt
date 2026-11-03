@@ -14,6 +14,6 @@ See Apache-2.0.txt for the full licence. Upstream notices in library metadata ar
 Bundled domain data:
 StevenBlack hosts — Copyright Steven Black; MIT (see StevenBlack-MIT.txt).
 https://github.com/StevenBlack/hosts
-HaGeZi Multi PRO — GPL-3.0 (see HaGeZi-GPL-3.0.txt).
+HaGeZi Multi PRO, Pop-Up Ads and Threat Intelligence Feeds Medium — GPL-3.0 (see HaGeZi-GPL-3.0.txt).
 https://github.com/hagezi/dns-blocklists
 The blocklist.txt header preserves the specific source snapshots used.

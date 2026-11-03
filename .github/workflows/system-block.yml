@@ -1,4 +1,4 @@
-name: Build System Wide Block Browser
+name: Build AdBlock
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
@@ -14,6 +14,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Validate bundled domain data
+        run: python3 scripts/check-blocklist.py
       - name: Diagnose public resolver certificate chain
         run: |
           mkdir -p systemblock/build/reports
@@ -30,7 +32,7 @@ jobs:
           path: systemblock/build/reports/
       - uses: actions/upload-artifact@v4
         with:
-          name: System-Wide-Block-Browser-debug
+          name: AdBlock-debug
           path: systemblock/build/outputs/apk/debug/*.apk
       - uses: actions/upload-artifact@v4
         with:
@@ -51,7 +53,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: System-Wide-Block-Browser-debug
+          name: AdBlock-debug
           path: apks
       - uses: actions/download-artifact@v4
         with:
@@ -80,7 +82,7 @@ jobs:
           path: smoke-results/
   release:
     needs: [build, emulator]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release v0.4.0]')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release v0.5.0]')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -88,13 +90,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: System-Wide-Block-Browser-debug
+          name: AdBlock-debug
           path: apks
       - name: Publish testing prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           test "$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/main --jq .object.sha)" = "$GITHUB_SHA"
-          cp apks/systemblock-debug.apk System-Wide-Block-Browser-v0.4.0.apk
-          sha256sum System-Wide-Block-Browser-v0.4.0.apk > SHA256SUMS.txt
-          gh release create v0.4.0 System-Wide-Block-Browser-v0.4.0.apk SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "System Wide Block Browser 0.4.0 — testing preview" --notes-file docs/RELEASE-0.4.0.md
+          cp apks/systemblock-debug.apk AdBlock-v0.5.0.apk
+          sha256sum AdBlock-v0.5.0.apk > SHA256SUMS.txt
+          gh release create v0.5.0 AdBlock-v0.5.0.apk SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "AdBlock 0.5.0 — testing preview" --notes-file docs/RELEASE-0.5.0.md

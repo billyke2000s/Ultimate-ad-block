@@ -8,7 +8,7 @@
 - Original `app` module keeps its inherited dependencies; do not confuse these with systemblock requirements.
 
 ## Bundled data
-`app/src/main/assets/blocklist.txt` is copied from Blockbrowser and shared as systemblock assets. Its source header identifies StevenBlack unified hosts (MIT) and HaGeZi Multi PRO (GPL-3.0), including upstream URLs and generation/version comments. Preserve the header. Upstream MIT/GPL licence texts are bundled in `systemblock/src/main/assets/licenses/` and included in APK assets. The source list header and upstream links are preserved; this is not a completed audit of every upstream list source. Do not invent a licence for inherited source if the upstream repository does not grant one.
+`systemblock/src/main/assets/blocklist.txt.gz` is AdBlock's independent bundled list. It combines StevenBlack unified hosts (MIT) and HaGeZi Multi PRO, Pop-Up Ads and Threat Intelligence Feeds Medium (GPL-3.0). The compressed header preserves source attribution; `blocklist-sources.json` records snapshot versions, SHA-256 hashes and input counts. Licence texts are bundled in `systemblock/src/main/assets/licenses/`. Run the updater from the repo root, then the offline checker. The app streams decompression into its rule parser; no external project asset directory is part of this module's source set.
 
 ## Network dependency
 Current allowed-DNS resolver: Cloudflare 1.1.1.1 (with 1.0.0.1 bootstrap fallback) over DNS over HTTPS on TCP 443, verified against cloudflare-dns.com with system trust and endpoint identification. No plaintext fallback. The protocol changed in 0.2.0 to encrypt allowed lookups; the resolver operator is unchanged. The committed list enables offline rule loading; no remote blocklist download is needed at app start.
@@ -17,4 +17,4 @@ Current allowed-DNS resolver: Cloudflare 1.1.1.1 (with 1.0.0.1 bootstrap fallbac
 GitHub Actions uploads a debug APK artifact. Debug signing is suitable for initial testing but is not a stable production update strategy. Before release, configure a dedicated stable signing key outside git, confirm update compatibility, document release versioning and preserve existing user data. Do not reuse or expose another project's private signing credentials.
 
 ## Inherited workflows and scripts
-Original browser workflows have `.disabled` suffixes and do not run. They are historical reference. The active workflow is `.github/workflows/system-block.yml`; inherited updater/scripts still target Blockbrowser and must not be treated as the new app's update infrastructure.
+Original browser workflows have `.disabled` suffixes and do not run. They are historical reference. The active workflow is `.github/workflows/system-block.yml`; `scripts/update-blocklist.sh` now refreshes AdBlock’s own bundle; other inherited scripts are reference material.

@@ -13,7 +13,7 @@ for k in range(len(route)):
  im=Image.new('RGB',(1000,510),'#0b1110');d=ImageDraw.Draw(im)
  d.rounded_rectangle((1,1,998,508),radius=22,outline='#31443b',width=2)
  d.text((40,30),'OBSKYRA  /  ANDROID DNS FILTER',font=f(14),fill='#a9c5b1')
- d.text((40,66),'ULTIMATE AD BLOCK',font=b(49),fill='#eef7e9')
+ d.text((40,66),'ADBLOCK',font=b(49),fill='#eef7e9')
  d.text((42,132),'Small snake. Big appetite for ad domains.',font=f(20),fill='#b2d57e')
  # LCD game panel, with pixel grid.
  d.rounded_rectangle((40,184,960,422),radius=12,fill='#afbf8b')
@@ -40,4 +40,4 @@ for k in range(len(route)):
  d.text((737,452),'ON-DEVICE STATS',font=f(14),fill='#d3e5c5')
  frames.append(im)
 frames[0].save(p/'ad-patrol.gif',save_all=True,append_images=frames[1:],duration=110,loop=0,optimize=True,disposal=1)
-print('Frames:',len(frames),'GIF bytes:',(p/'docs/assets/ad-patrol.gif').stat().st_size)
+print('Frames:',len(frames),'GIF bytes:',(p/'ad-patrol.gif').stat().st_size)

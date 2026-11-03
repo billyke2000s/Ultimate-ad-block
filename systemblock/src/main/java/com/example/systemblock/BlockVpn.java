@@ -34,20 +34,20 @@ public final class BlockVpn extends VpnService {
   PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,Dashboard.class),PendingIntent.FLAG_IMMUTABLE);
   PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,BlockVpn.class).setAction("stop"),PendingIntent.FLAG_IMMUTABLE);
   startForeground(1,new Notification.Builder(this,"blocking").setSmallIcon(android.R.drawable.ic_lock_lock)
-    .setContentTitle("System Wide Block Browser").setContentText("Local DNS filter — tap for status")
+    .setContentTitle("AdBlock").setContentText("Local DNS filter — tap for status")
     .setContentIntent(open).addAction(new Notification.Action.Builder(null,"Stop",stop).build()).setOngoing(true).build());
   status="Loading blocklist…";
   reader=new Thread(this::readTunnel,"dns-reader");reader.start();return START_NOT_STICKY;
  }
  private void readTunnel(){
   try{
-   DomainRules loaded=new DomainRules(getAssets().open("blocklist.txt"),getSharedPreferences("settings",MODE_PRIVATE).getString("exceptions",""));
+   DomainRules loaded=new DomainRules(new java.util.zip.GZIPInputStream(getAssets().open("blocklist.txt.gz")),getSharedPreferences("settings",MODE_PRIVATE).getString("exceptions",""));
    FileInputStream input;
    synchronized(lifecycle){
     if(stopping)return;
     // Publish all resources under the same lock used by shutdown. Stop cannot miss a new tunnel.
     rules=loaded;
-    tunnel=new Builder().setSession("System Wide Block Browser").setMtu(1500)
+    tunnel=new Builder().setSession("AdBlock").setMtu(1500)
       .addAddress("10.111.0.1",32).addDnsServer("10.111.0.2").addRoute("10.111.0.2",32)
       .allowBypass().allowFamily(OsConstants.AF_INET6).setBlocking(false).establish();
     if(tunnel==null)throw new IOException("VPN permission was revoked");

@@ -1,0 +1,38 @@
+{
+  "generated_utc": "2026-11-03T21:18:08.086092+00:00",
+  "domain_count": 507468,
+  "sources": [
+    {
+      "name": "StevenBlack unified hosts",
+      "license": "MIT",
+      "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+      "version": "2610242248",
+      "sha256": "0d81148f9990ecbde614ba1a135f81113fbb5f9972e783af22ff1c6dadb57508",
+      "parsed_domains": 77760
+    },
+    {
+      "name": "HaGeZi Multi PRO",
+      "license": "GPL-3.0",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro-onlydomains.txt",
+      "version": "2026.1103.0956.06",
+      "sha256": "bbb7b5e2a7ef5e4f3e77d4922179d90321e514629fc9c8a619fd29db74d2c5d8",
+      "parsed_domains": 247757
+    },
+    {
+      "name": "HaGeZi Pop-Up Ads",
+      "license": "GPL-3.0",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/popupads-onlydomains.txt",
+      "version": "2026.1103.0902.09",
+      "sha256": "de7104e009051373c53e10f304a27b8e303500de81a3a80519e9ca0cf76dde02",
+      "parsed_domains": 77680
+    },
+    {
+      "name": "HaGeZi Threat Intelligence Feeds Medium",
+      "license": "GPL-3.0",
+      "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.medium-onlydomains.txt",
+      "version": "2026.1103.0929.08",
+      "sha256": "0a527e69ee1f189383de36c73e6e2e5715d8d2ca7e1d422213da4bfaaee0fcce",
+      "parsed_domains": 318578
+    }
+  ]
+}

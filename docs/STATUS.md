@@ -1,7 +1,7 @@
 # Current state — read before work
 
 Updated: 2026-11-03. Repository: `billyke2000s/Ultimate-ad-block`.
-Product: **System Wide Block Browser**. Published **v0.4.0 testing prerelease**.
+Product: **AdBlock**. Published **v0.4.0 testing prerelease**.
 
 ## Verified v0.4.0 release
 - Release: https://github.com/billyke2000s/Ultimate-ad-block/releases/tag/v0.4.0
@@ -89,6 +89,14 @@ Product: **System Wide Block Browser**. Published **v0.4.0 testing prerelease**.
 - Existing counters, daily history, exceptions, package identity and DNS routing are preserved. No per-app identity is claimed.
 - Native alert dialogs now use the app palette; Settings is a full page.
 - Build, 19 unit tests, lint and API 26/35 emulator checks passed. v0.4.0 is published; see verified release above.
+
+## Standalone AdBlock branding and expanded rules — 0.5.0
+- Display name, dashboard, VPN session, notification, README, banner and release artifact use AdBlock.
+- README no longer links or promotes the browser project. Required upstream data credits remain in licence notices.
+- Independent compressed asset: 507,468 unique rules versus 215,492 previously (2.35x). StevenBlack + HaGeZi Multi PRO + Pop-Up Ads + TIF Medium, with parent/subdomain deduplication.
+- Additional coverage includes known threats, not only advertising. The medium threat list limits mobile memory requirements; no family, gambling or whole-TLD category list was added.
+- Removed the Gradle asset dependency on the original browser module. Updater records exact feed versions/hashes; CI validates the committed bundle and connectivity/ad sentinels.
+- Offline bundle integrity check passed locally. Android build, lint, unit and API 26/35 integration checks pending for this revision.
 
 ## Next work
 1. Run the remaining physical-device matrix in VERIFICATION; record models, Android versions, APK hash and exact cases.

@@ -2,7 +2,7 @@
 
 ## Thirty-second orientation
 - Repository: `billyke2000s/Ultimate-ad-block`.
-- Product: **System Wide Block Browser**, an independent Android DNS filtering app.
+- Product: **AdBlock**, an independent Android DNS filtering app.
 - `dnsprobe/` is a CI-only normal app for cross-app DNS/TCP checks; never ship it as part of the blocker APK.
 - Active module: `systemblock/`; source package `com.example.systemblock`; installed ID `com.obskyra.systemwideblockbrowser`.
 - `app/`, most `scripts/`, old `TESTING.md`, `CHANGELOG.md` and screenshots are inherited Blockbrowser material. They are reference material, not proof that the new blocker works. Do not change the original upstream Blockbrowser repository as part of this project.

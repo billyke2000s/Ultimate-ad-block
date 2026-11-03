@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="docs/assets/ad-patrol.gif" width="1000" alt="Ultimate Ad Block: a Nokia-era pixel snake loops around a green LCD screen, eating AD tiles." />
+  <img src="docs/assets/ad-patrol.gif" width="1000" alt="AdBlock: a Nokia-era pixel snake loops around a green LCD screen, eating AD tiles." />
 </p>
 
 <p align="center">
-  <strong>System Wide Block Browser</strong><br />
-  A small Android DNS filter with an appetite for ad and tracker domains.
+  <strong>AdBlock</strong><br />
+  An Android adblocker with local filtering and a clear view of your DNS activity.
 </p>
 
 <p align="center">
@@ -30,13 +30,13 @@
 
 The idea is simple: check a DNS request against local domain rules, refuse blocked names, and resolve allowed names over an authenticated HTTPS connection. Keep the controls understandable and the statistics on the device.
 
-Built from the domain list used by [Blockbrowser](https://github.com/billyke2000s/Blockbrowser), this is a separate Android app. The snake above is a decorative animation, not a live dashboard or a measure of ads removed.
+The snake above is a decorative animation, not a live dashboard or a measure of ads removed.
 
 ## The loadout
 
 | Capability | What it does |
 | :--- | :--- |
-| **Local domain filtering** | Bundles 215,000+ ad and tracker domain rules, with parent-domain matching. |
+| **Local domain filtering** | Bundles 507,468 unique ad, tracker, pop-up and known-threat domain rules, with parent-domain matching. |
 | **Encrypted upstream DNS** | Resolves allowed queries through certificate-verified Cloudflare DNS over HTTPS, with no plaintext fallback. |
 | **Compact overview** | Fixed bottom navigation and four chart selectors that fit across the screen: pie, ring, bars and week. |
 | **Visible domain activity** | Search the latest 200 DNS queries and filter by blocked, allowed or failed, with per-query times and an allow-domain action. |
@@ -58,7 +58,13 @@ Built from the domain list used by [Blockbrowser](https://github.com/billyke2000
 
 <p align="center"><sub>Actual v0.4.0 Android 15 emulator captures. Queries are synthetic test traffic.</sub></p>
 
-Activity history begins with this version; older totals do not contain past allowed-domain names. Recent activity is stored locally and can be disabled or cleared independently of the totals.
+Activity history began in v0.4.0; older totals do not contain past allowed-domain names. Recent activity is stored locally and can be disabled or cleared independently of the totals.
+
+## Bundled rules
+
+The v0.5.0 bundle contains **507,468 unique domain rules**, compared with 215,492 previously. It combines StevenBlack unified hosts with HaGeZi Multi PRO, Pop-Up Ads and TIF Medium, then removes duplicates and redundant subdomain rules. The additional coverage includes known malware and phishing domains as well as ads and trackers. Exceptions remain available in Settings.
+
+The compressed bundle belongs to this app and loads offline. [Source versions, counts and hashes](systemblock/src/main/assets/blocklist-sources.json) record exactly what was included. Run `bash scripts/update-blocklist.sh` to refresh it, then `python3 scripts/check-blocklist.py` to validate it. Lists are refreshed for releases, rather than silently downloaded at app startup.
 
 ## Under the pixels
 
@@ -117,16 +123,13 @@ The installed application ID is `com.obskyra.systemwideblockbrowser`; Android 8.
 | :--- | :--- |
 | [`systemblock/`](systemblock/) | The independent DNS blocker, dashboard and tests. |
 | [`dnsprobe/`](dnsprobe/) | CI-only app for cross-app DNS and connectivity checks; excluded from the published blocker APK. |
-| [`app/`](app/) | Preserved original browser source and shared domain-list asset. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Data flow, entry points and lifecycle ownership. |
 | [`docs/STATUS.md`](docs/STATUS.md) | Implemented, verified and outstanding work. |
 | [`AGENTS.md`](AGENTS.md) | Contributor and AI-agent rules; start here before changing code. |
 
-Inherited browser screenshots and the older browser tour describe Blockbrowser, not this app's current interface.
-
 ## Credits & care
 
-The bundled domain list retains attribution to **StevenBlack hosts (MIT)** and **HaGeZi Multi PRO (GPL-3.0)**. Applicable notices and licence texts are included in [APK assets](systemblock/src/main/assets/licenses/); see [dependencies](docs/DEPENDENCIES.md).
+The bundled domain list retains attribution to **StevenBlack hosts (MIT)** and **HaGeZi Multi PRO, Pop-Up Ads and Threat Intelligence Feeds Medium (GPL-3.0)**. Applicable notices and licence texts are included in [APK assets](systemblock/src/main/assets/licenses/); see [dependencies](docs/DEPENDENCIES.md).
 
 The Snake-inspired banner is original repository artwork, built with Pillow. It is a nod to the monochrome phone era, with no affiliation to Nokia. [Animation source](docs/assets/render-ad-patrol.py).
 

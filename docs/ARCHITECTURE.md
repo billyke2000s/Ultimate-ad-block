@@ -5,7 +5,7 @@ The new app is module `systemblock`. Gradle also retains `app`, the original bro
 
 ## Data flow
 1. `Dashboard.java` calls VpnService.prepare and starts `BlockVpn` only after system consent.
-2. `BlockVpn.java` loads `DomainRules` from the shared asset `app/src/main/assets/blocklist.txt` plus locally stored exceptions.
+2. `BlockVpn.java` loads `DomainRules` from its own gzip-compressed asset `systemblock/src/main/assets/blocklist.txt.gz` plus locally stored exceptions.
 3. A local VPN advertises DNS `10.111.0.2`, owns `10.111.0.1`, routes **only 10.111.0.2/32**, and allows the IPv6 family. Regular traffic is not forwarded by this service.
 4. The tunnel reader passes IPv4 UDP/53 packets to `DnsPacket`. Other packet types are currently ignored.
 5. `DomainRules` checks allow exceptions first, then exact/parent-domain block matches. A blocked query receives NXDOMAIN.
@@ -45,3 +45,6 @@ Tunnel input/output each own duplicated ParcelFileDescriptors. The reader polls 
 
 ## Compact dashboard and activity (0.4.0)
 Dashboard uses fixed Overview / Activity / Settings navigation. Overview retains four compact chart modes; Activity uses a filtered ListView over newest-first snapshots of QueryLog. QueryLog retains at most 200 domain/outcome/time entries. Stats serializes the activity array with the existing JSON counters; old files without the array migrate to an empty log. The record_activity preference controls new entries, not counters. Clear activity preserves totals; Reset statistics clears both. Settings disclose local retention and provide controls. No query history is uploaded or written to system logs. No UI refresh reconstructs the navigation shell.
+
+## Independent bundled data (0.5.0)
+The systemblock module no longer adds the browser asset directory to its Gradle source set. BlockVpn streams GZIP decompression into DomainRules. The release ships 507,468 unique rules from four credited feeds; the source manifest records snapshots. The original app module remains archived reference code. Display branding is AdBlock; the installed application ID remains stable for existing settings and updates.
