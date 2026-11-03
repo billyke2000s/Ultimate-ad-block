@@ -51,7 +51,9 @@ public final class SmokeInstrumentation extends Instrumentation {
     SystemClock.sleep(250);await(false);
    }
    context.startForegroundService(new Intent(context,BlockVpn.class));await(true);
+   dashboardEvidence(true);
    context.startService(new Intent(context,BlockVpn.class).setAction("stop"));await(false);
+   dashboardEvidence(false);
    result.putString("stream","PASS: blocked DNS, encrypted allowed DNS, repeated start/stop, stop during startup, notification stop action.\n");
    capture();finish(Activity.RESULT_OK,result);
   }catch(Throwable error){
@@ -61,6 +63,31 @@ public final class SmokeInstrumentation extends Instrumentation {
    result.putString("stream","FAIL: "+error+"; state="+failureState+"; blocked="+stats.blocked+"; allowed="+stats.allowed+"; failed="+stats.failed+"\n");capture();finish(Activity.RESULT_CANCELED,result);
   }
  }
+ private void dashboardEvidence(boolean active)throws Exception{
+  Dashboard dashboard=(Dashboard)startActivitySync(new Intent(getTargetContext(),Dashboard.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
+  getUiAutomation().waitForIdle(500,5000);
+  runOnMainSync(()->{
+   android.view.View toggle=dashboard.getWindow().getDecorView().findViewWithTag("protection-toggle");
+   if(!(toggle instanceof android.widget.Button))throw new AssertionError("Missing protection action");
+   String expected=active?"Pause protection":"Start protection";
+   if(!expected.contentEquals(((android.widget.Button)toggle).getText()))throw new AssertionError("Protection action disagrees with service");
+  });
+  capture(active?"dashboard-active.png":"dashboard-stopped.png");
+  if(!active){
+   for(int mode=0;mode<4;mode++){
+    final int selected=mode;
+    runOnMainSync(()->{
+     android.view.View tab=dashboard.getWindow().getDecorView().findViewWithTag("chart-mode-"+selected);
+     if(tab==null || !tab.performClick() || !tab.isSelected())throw new AssertionError("Chart selector failed");
+     android.view.View chart=dashboard.getWindow().getDecorView().findViewWithTag("activity-chart");
+     if(chart==null || chart.getContentDescription()==null || !chart.getContentDescription().toString().contains("DNS queries"))throw new AssertionError("Missing accessible chart values");
+     chart.requestRectangleOnScreen(new android.graphics.Rect(0,0,chart.getWidth(),chart.getHeight()),true);
+    });
+    getUiAutomation().waitForIdle(500,5000);
+    capture("chart-"+mode+".png");
+   }
+  }
+ }
  private String shell(String command)throws Exception{
   try(java.io.InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(getUiAutomation().executeShellCommand(command))){
    java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] buf=new byte[1024];int n;
@@ -68,10 +95,11 @@ public final class SmokeInstrumentation extends Instrumentation {
    return new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);
   }
  }
- private void capture(){
+ private void capture(){capture("dashboard.png");}
+ private void capture(String name){
   try{
    android.graphics.Bitmap image=getUiAutomation().takeScreenshot();
-   if(image!=null){try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getTargetContext().getExternalFilesDir(null),"dashboard.png"))){image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}image.recycle();}
+   if(image!=null){try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(getTargetContext().getExternalFilesDir(null),name))){image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}image.recycle();}
   }catch(Exception ignored){}
  }
  private static void await(boolean expected)throws Exception{

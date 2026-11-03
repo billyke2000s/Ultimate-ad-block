@@ -9,7 +9,7 @@ Product: **System Wide Block Browser**. Published **v0.2.0 testing prerelease**.
 - Verified source commit: `042ab7a5d9dbd29b82bc452fb2a50252d3b362a9`.
 - Successful build, emulator and publication run: https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41549297575
 - APK SHA-256: `392f9bfb015224ca349641e8a0a94b5d0254b9d1ff98faadec48aaf20965dea1`.
-- This handoff update changes documentation only; the evidence above applies to the immutable release commit.
+- The evidence above applies to the immutable v0.2.0 release commit. The dashboard redesign below is tracked separately.
 
 ## Implementation and evidence
 | Area | Current status | Evidence / limits |
@@ -51,6 +51,14 @@ Product: **System Wide Block Browser**. Published **v0.2.0 testing prerelease**.
 - Removed the inaccurate ransomware feature sentence from the README; no application behavior changed.
 - User supplied a screenshot of Google Play Protect blocking the v0.2.0 APK as harmful. Cause and classification remain unresolved. Do not claim the APK is cleared or recommend bypassing the warning.
 - This report concerns installation; full physical-device runtime testing remains pending.
+
+## Dashboard redesign — 0.3.0
+- Native dashboard redesigned with a dark green visual system, shield/launcher icon, one service-driven start/pause action, stat cards and chart tabs.
+- Android settings, reset and explanations moved to dialogs; allowed-domain controls remain available. Stats, exceptions, package ID and DNS behavior are preserved.
+- Added active/stopped action checks, all-mode chart interaction checks and per-mode emulator screenshots to CI.
+- README warning box removed at the user's request. The Play Protect report above remains unresolved; removing presentation copy is not clearance.
+- User screenshots show v0.2.0 running with real blocked/allowed counters on their phone; this is limited observation, not the full device matrix.
+- Validation for the redesigned UI: awaiting CI build, lint, unit tests and API 26/35 emulator results. No new APK is claimed verified yet.
 
 ## Next work
 1. Run the remaining physical-device matrix in VERIFICATION; record models, Android versions, APK hash and exact cases.

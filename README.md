@@ -32,9 +32,6 @@ The idea is simple: check a DNS request against local domain rules, refuse block
 
 Built from the domain list used by [Blockbrowser](https://github.com/billyke2000s/Blockbrowser), this is a separate Android app. The snake above is a decorative animation, not a live dashboard or a measure of ads removed.
 
-> [!WARNING]
-> **Testing preview · Play Protect report unresolved.** A user reported Google Play Protect blocking the v0.2.0 APK as harmful. The cause has not been established; successful builds and emulator tests do not clear that warning. Leave the flagged APK uninstalled while it is investigated. See [current status](docs/STATUS.md).
-
 ## The loadout
 
 | Capability | What it does |
@@ -73,7 +70,7 @@ The upstream resolver can see allowed DNS queries. No analytics or query-history
 | Cross-app DNS and ordinary connectivity | Exercised by a separate probe app on Android 8 / API 26 and Android 15 / API 35 emulators. |
 | Service lifecycle | Named start/stop cases exercised in emulator CI. |
 | Charts | Implemented; basic dashboard/pie rendering inspected. Full visual and accessibility review remains pending. |
-| Physical devices | Full runtime test matrix remains pending. A reported Play Protect installation block remains unresolved. |
+| Physical devices | Full runtime test matrix remains pending; see the status document for device reports. |
 | Distribution | Debug-signed testing prerelease; stable production signing and update compatibility remain pending. |
 
 Source for the published APK: [`042ab7a`](https://github.com/billyke2000s/Ultimate-ad-block/commit/042ab7a5d9dbd29b82bc452fb2a50252d3b362a9). Detailed evidence and remaining work live in [STATUS](docs/STATUS.md).
@@ -97,7 +94,7 @@ gradle :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:li
 
 APK output: `systemblock/build/outputs/apk/debug/systemblock-debug.apk`.
 
-The installed application ID is `com.obskyra.systemwideblockbrowser`; Android 8.0 / API 26 is the minimum. Local builds do not establish Play Protect clearance. For the device matrix and reproducible checks, read [VERIFICATION](docs/VERIFICATION.md).
+The installed application ID is `com.obskyra.systemwideblockbrowser`; Android 8.0 / API 26 is the minimum. For the device matrix and reproducible checks, read [VERIFICATION](docs/VERIFICATION.md).
 
 ## A repository you can navigate
 
