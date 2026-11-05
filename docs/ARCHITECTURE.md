@@ -35,8 +35,8 @@ The new app is module `systemblock`. Gradle also retains `app`, the original bro
 ## Persistence
 `settings` preferences contain a domain exception string. `dns_stats` preferences contain `data`: blocked/allowed/failed totals, up to 200 blocked domain counters, and up to 90 daily counters. Stats are buffered and saved periodically/on lifecycle events. Abrupt process death may lose the latest buffered increments. No query-upload backend is present.
 
-## Unsupported paths
-TCP DNS, direct DoH/DoT interception, general packet forwarding, HTTPS content filtering, certificate installation, same-domain ad removal, and simultaneous use of another VPN app. Android Private DNS and app-specific encrypted DNS may bypass filtering. See STATUS before claiming any implementation works on a device.
+## DNS-only mode limitations
+Client TCP DNS in DNS-only mode, direct DoH/DoT interception, HTTPS content filtering, certificate installation, same-domain ad removal, and simultaneous use of another VPN app. Android Private DNS and app-specific encrypted DNS may bypass filtering. See STATUS before claiming any implementation works on a device.
 
 DNS-only routing uses Android's `allowBypass()` option: default DNS still uses the virtual resolver, while apps may deliberately select another network. This is not an enforcement/lockdown VPN. The runtime tests require automatic IPv4/IPv6 DNS API queries, ordinary app name resolution and ordinary TCP connectivity as well as an increased local blocked counter.
 
@@ -47,4 +47,40 @@ Tunnel input/output each own duplicated ParcelFileDescriptors. The reader polls 
 Dashboard uses fixed Overview / Activity / Settings navigation. Overview retains four compact chart modes; Activity uses a filtered ListView over newest-first snapshots of QueryLog. QueryLog retains at most 200 domain/outcome/time entries. Stats serializes the activity array with the existing JSON counters; old files without the array migrate to an empty log. The record_activity preference controls new entries, not counters. Clear activity preserves totals; Reset statistics clears both. Settings disclose local retention and provide controls. No query history is uploaded or written to system logs. No UI refresh reconstructs the navigation shell.
 
 ## Independent bundled data (0.5.0)
-The systemblock module no longer adds the browser asset directory to its Gradle source set. BlockVpn streams GZIP decompression into DomainRules. The release ships 507,468 unique rules from four credited feeds; the source manifest records snapshots. The original app module remains archived reference code. Display branding is AdBlock; the installed application ID remains stable for existing settings and updates.
+The systemblock module no longer adds the browser asset directory to its Gradle source set. The Android asset merger expands the gzip source to packaged blocklist.txt; BlockVpn streams that asset into DomainRules, with a gzip fallback for other packagers. The release ships 507,468 unique rules from four credited feeds; the source manifest records snapshots. The original app module remains archived reference code. Display branding is AdBlock; the installed application ID remains stable for existing settings and updates.
+
+
+## Experimental remote VPN modes (0.6)
+
+`BlockVpn` remains the sole manifest VPN service. `NativeSession` binds protocol
+transport sockets to the current non-VPN network after `VpnService.protect`.
+WireGuard uses upstream Go Device + the official Android config parser; the AAR's
+own service/backends are excluded. OpenVPN 3 uses an Android JNI TunBuilder adapter
+and Mbed TLS. No external VPN app is started.
+
+The real Android TUN and protocol engine are joined through a datagram socketpair
+and the native Go bridge. Ordinary packets pass unchanged. Captured UDP/TCP port
+53 packets enter a bounded gVisor DNS stack, preserving the queried resolver
+address even for hard-coded DNS. DomainRules/allowances and Stats remain the
+existing Java instances. Allowed DNS uses profile/server resolvers over a second
+userspace stack **inside the same protocol tunnel**, currently TCP upstream with
+UDP truncation budget handling. No outside resolver fallback is available.
+Separate endpoint tuples distinguish proxy DNS replies from ordinary app traffic.
+
+A preconnection guard captures both families during setup. Replacing a TUN is
+performed before closing the previous descriptors. Remote failures retain the
+current routes; explicit Stop/revoke closes engines, bridge workers and TUNs.
+Only Android lockdown can enforce fail-closed behavior while this process is dead.
+Remote services request sticky restart; always-on is exposed for remote mode.
+Never use Android lockdown with AdBlock-only mode.
+
+WireGuard includes profile AllowedIPs plus host routes for DNS. OpenVPN uses the
+core's included-route emulation. Traffic outside a split tunnel's included routes
+is intentionally direct. Unsupported/missing families are blocked by Android's
+builder default rather than allowFamily/allowBypass. DNS endpoint bootstrap uses
+the non-VPN network; protocol transport then remains protected and network-bound.
+
+`VpnProfiles` stores the complete profile and credentials in an AtomicFile in
+noBackupFilesDir, authenticated with AES-256/GCM and a nonexportable Android Keystore
+key. The import path never executes directives or reads arbitrary filesystem paths.
+ZIP references are bounded in memory and reject traversal, duplicates and ambiguity.

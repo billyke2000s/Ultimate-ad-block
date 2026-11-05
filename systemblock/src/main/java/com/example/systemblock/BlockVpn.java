@@ -39,11 +39,15 @@ public final class BlockVpn extends VpnService {
   nm.createNotificationChannel(new NotificationChannel("blocking","System-wide blocking",NotificationManager.IMPORTANCE_LOW));
   startForeground(1,notification("Starting protection…"));
   status="Loading blocklist…";
-  reader=new Thread(this::readTunnel,"dns-reader");reader.start();return START_NOT_STICKY;
+  reader=new Thread(this::readTunnel,"dns-reader");reader.start();return getSharedPreferences("settings",MODE_PRIVATE).getString("vpn_profile","").isEmpty()?START_NOT_STICKY:START_STICKY;
+ }
+ private InputStream openRules()throws IOException{
+  // Android's asset merger expands .gz files and strips the extension.
+  try{return getAssets().open("blocklist.txt");}catch(FileNotFoundException absent){return new java.util.zip.GZIPInputStream(getAssets().open("blocklist.txt.gz"));}
  }
  private void readTunnel(){
   try{
-   DomainRules loaded=new DomainRules(new java.util.zip.GZIPInputStream(getAssets().open("blocklist.txt.gz")),getSharedPreferences("settings",MODE_PRIVATE).getString("exceptions",""));
+   DomainRules loaded=new DomainRules(openRules(),getSharedPreferences("settings",MODE_PRIVATE).getString("exceptions",""));
    String selected=getSharedPreferences("settings",MODE_PRIVATE).getString("vpn_profile","");
    if(!selected.isEmpty()){runRemote(loaded,selected);return;}
    FileInputStream input;
@@ -105,7 +109,7 @@ public final class BlockVpn extends VpnService {
    @Override public void onLost(Network n){if(n.equals(network)){network=null;NativeSession session=remote;if(session!=null)new Thread(session::networkChanged,"vpn-network").start();}}
   };
   cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN).build(),networks);
-  try{VpnProfiles.Profile profile=new VpnProfiles(this).find(selected);synchronized(lifecycle){if(stopping)return;remote=new NativeSession(this,loaded,profile);activeSession=remote;}remote.start();}catch(Exception|LinkageError failure){remoteStatus("VPN setup failed — traffic blocked. Check profile, DNS and network.");}
+  try{VpnProfiles.Profile profile=new VpnProfiles(this).find(selected);synchronized(lifecycle){if(stopping)return;remote=new NativeSession(this,loaded,profile);activeSession=remote;}remote.start();}catch(Exception|LinkageError failure){String message="VPN setup failed — traffic blocked. Check profile, DNS and network.";NativeSession session=remote;if(session!=null)session.fail(message);else remoteStatus(message);}
   while(!stopping){NativeSession session=remote;if(session!=null)session.poll();Thread.sleep(1500);}
  }
  private Notification notification(String content){

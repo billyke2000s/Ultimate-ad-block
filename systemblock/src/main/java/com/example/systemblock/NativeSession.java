@@ -14,7 +14,7 @@ final class NativeSession implements Closeable {
  private final BlockVpn service;
  private final DomainRules rules;
  private final VpnProfiles.Profile profile;
- private volatile boolean closing;
+ private volatile boolean closing,initializationFailed;
  private long context,wireguard,bridge,open;
  private Thread openThread;
  private final List<String> addresses=new ArrayList<>(),routes=new ArrayList<>(),dns=new ArrayList<>(),search=new ArrayList<>();
@@ -92,6 +92,7 @@ final class NativeSession implements Closeable {
  int newBuilder(){addresses.clear();routes.clear();dns.clear();search.clear();mtu=1280;return closing?0:1;}
  int addAddress(String address,int prefix){addresses.add(address+"/"+prefix);return 1;}
  int addRoute(String address,int prefix){routes.add(address+"/"+prefix);return 1;}
+ int setServer(String address,int ignored){server=address;return 1;}
  int addDns(String address,int ignored){dns.add(address);return 1;}
  int addSearch(String domain,int ignored){search.add(domain);return 1;}
  int setMtu(int value){if(value<1280||value>9000)return 0;mtu=value;return 1;}
@@ -103,8 +104,9 @@ final class NativeSession implements Closeable {
   else if(Arrays.asList("RECONNECTING","DISCONNECTED","AUTH_FAILED","CERT_VERIFY_FAIL","TLS_ERROR","CONNECTION_TIMEOUT","RESOLVE","CONNECTING","WAIT","TCP_CONNECT").contains(name)){connectionState=name.replace('_',' ');connectedSince=0;}
   service.remoteStatus(connectionState);return 1;
  }
+ void fail(String message){initializationFailed=true;connectedSince=0;connectionState=message;service.remoteStatus(message);}
  synchronized void poll(){
-  if(closing)return;
+  if(closing||initializationFailed)return;
   if(bridge>0&&!bridgeAlive(bridge)){connectedSince=0;connectionState="Packet bridge stopped — traffic blocked";service.remoteStatus(connectionState);return;}
   if(wireguard>0){String config=wgConfig(wireguard);long newest=0;for(String line:config.split("\n"))if(line.startsWith("last_handshake_time_sec="))try{newest=Math.max(newest,Long.parseLong(line.substring(line.indexOf('=')+1)));}catch(NumberFormatException ignored){}
    if(newest>0&&System.currentTimeMillis()/1000-newest<180){if(connectedSince==0)connectedSince=android.os.SystemClock.elapsedRealtime();connectionState="Connected";}
@@ -113,7 +115,7 @@ final class NativeSession implements Closeable {
  }
  String protocol(){return profile.protocol;}
  synchronized long bytes(boolean rx){return bridge>0?bridgeBytes(bridge,rx):0;}
- synchronized void networkChanged(){if(closing)return;connectedSince=0;connectionState="Reconnecting — traffic blocked";if(wireguard>0)wgRebind(wireguard);if(open>0&&openThread!=null&&openThread.isAlive())openReconnect(open);service.remoteStatus(connectionState);}
+ synchronized void networkChanged(){if(closing||initializationFailed)return;connectedSince=0;connectionState="Reconnecting — traffic blocked";if(wireguard>0)wgRebind(wireguard);if(open>0&&openThread!=null&&openThread.isAlive())openReconnect(open);service.remoteStatus(connectionState);}
  @Override public void close(){
   closing=true;
   long client;Thread thread;synchronized(this){client=open;thread=openThread;if(client>0)openStop(client);}

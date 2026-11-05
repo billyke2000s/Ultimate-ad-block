@@ -35,7 +35,7 @@ public:
  bool socket_protect(openvpn_io::detail::socket_type s,std::string,bool)override{return protect(reinterpret_cast<uintptr_t>(thisCallbacks()),s);}
  Callbacks* thisCallbacks(){return static_cast<Callbacks*>(this);}
  bool pause_on_connection_timeout()override{return false;}
- void event(const openvpn::ClientAPI::Event&e)override{Callbacks::event(e.error?"ERROR:"+e.name:e.name);}
+ void event(const openvpn::ClientAPI::Event&e)override{if(e.name=="CONNECTED"){auto info=connection_info();text("setServer",info.serverIp+":"+info.serverPort);}Callbacks::event(e.error?"ERROR:"+e.name:e.name);}
  void log(const openvpn::ClientAPI::LogInfo&)override{} // Never log profiles, credentials or server messages.
  void acc_event(const openvpn::ClientAPI::AppCustomControlMessageEvent&)override{}
  void external_pki_cert_request(openvpn::ClientAPI::ExternalPKICertRequest&r)override{r.error=true;r.errorText="External PKI is unsupported";}

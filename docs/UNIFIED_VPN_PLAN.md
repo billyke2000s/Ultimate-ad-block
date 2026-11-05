@@ -1,6 +1,6 @@
 # Unified VPN support — implementation specification
 
-Status: **Design only; WireGuard/OpenVPN are not yet implemented or verified.** This document must not be used as evidence of working VPN functionality.
+Status: **Both engines and the shared bridge are implemented experimentally.** This specification remains the acceptance target. Consult STATUS and VERIFICATION for actual evidence; source and build success alone do not establish device connectivity.
 
 ## Goal
 Keep one Android `VpnService` owned by AdBlock. Offer three modes: DNS-only AdBlock (existing behaviour), WireGuard + AdBlock, and OpenVPN + AdBlock. The menu is opened from a hamburger icon; the existing Overview / Activity / Settings navigation remains intact.

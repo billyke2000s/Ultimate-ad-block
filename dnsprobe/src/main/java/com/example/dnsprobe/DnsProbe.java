@@ -37,7 +37,7 @@ public final class DnsProbe extends Activity {
    String server=getIntent().getStringExtra("remote_ip");
    if(server!=null){
     // This address is reachable only through the controlled VPN server's interface.
-    try(Socket socket=new Socket()){socket.connect(new InetSocketAddress(server,8080),8000);socket.setSoTimeout(8000);socket.getOutputStream().write("GET / HTTP/1.0\r\n\r\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));byte[] response=new byte[512];int n=socket.getInputStream().read(response);if(n<=0||!new String(response,0,n,java.nio.charset.StandardCharsets.US_ASCII).contains("VPN-ENDPOINT"))throw new AssertionError("Controlled endpoint unreachable through VPN");}
+    try(Socket socket=new Socket()){socket.connect(new InetSocketAddress(server,8080),8000);socket.setSoTimeout(8000);socket.getOutputStream().write("GET / HTTP/1.0\r\n\r\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));java.io.ByteArrayOutputStream response=new java.io.ByteArrayOutputStream();byte[] chunk=new byte[512];int n;while((n=socket.getInputStream().read(chunk))!=-1){if(response.size()+n>4096)throw new AssertionError("Oversized endpoint response");response.write(chunk,0,n);}String body=response.toString("US-ASCII"),prefix=server.substring(0,server.lastIndexOf('.')+1);if(!body.contains("VPN-ENDPOINT "+prefix))throw new AssertionError("Endpoint did not observe a VPN client source address");}
     // Ordinary Internet TCP must also work while captured by the remote VPN.
     try(Socket socket=new Socket()){socket.connect(new InetSocketAddress("1.1.1.1",443),8000);}
     tcpDns(blocking);

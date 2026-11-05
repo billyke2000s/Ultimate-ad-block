@@ -270,7 +270,11 @@ func ips(s string) []netip.Addr {
 func UBBridgeStart(tfd, efd, mtu C.int, addresses, dns *C.char, filter, record, ctx C.uintptr_t) C.longlong {
 	b := &bridge{tun: packetFile(int(tfd), "android-tun"), engine: packetFile(int(efd), "engine-packets"), servers: ips(C.GoString(dns)), ctx: ctx, filter: filter, record: record, stop: make(chan struct{}), jobs: make(chan struct{}, 32), ports: map[uint16]bool{}, nextPort: 61000}
 	var e error
-	b.upstream, e = newStack(ips(C.GoString(addresses)), int(mtu), func(p []byte) { b.engine.Write(p) })
+	b.upstream, e = newStack(ips(C.GoString(addresses)), int(mtu), func(p []byte) {
+		if n, e := b.engine.Write(p); e == nil {
+			b.tx.Add(int64(n))
+		}
+	})
 	if e != nil {
 		b.close()
 		return -1
@@ -394,6 +398,7 @@ func (b *bridge) fromEngine() {
 		if e != nil {
 			return
 		}
+		b.rx.Add(int64(n))
 		v := p[:n]
 		_, proto, o, ok := packet(v)
 		if ok && (proto == 6 || proto == 17) && len(v) >= o+4 {
@@ -403,7 +408,6 @@ func (b *bridge) fromEngine() {
 				continue
 			}
 		}
-		b.rx.Add(int64(n))
 		if _, e = b.tun.Write(v); e != nil {
 			return
 		}
@@ -434,13 +438,14 @@ func (b *bridge) udpForwarder() {
 			defer func() { <-b.jobs }()
 			data := make([]byte, 65535)
 			for {
-				c.SetDeadline(time.Now().Add(10 * time.Second))
+				c.SetReadDeadline(time.Now().Add(250 * time.Millisecond))
 				n, e := c.Read(data)
 				if e != nil {
 					return
 				}
 				answer := b.answer(data[:n], true)
 				if answer != nil {
+					c.SetWriteDeadline(time.Now().Add(time.Second))
 					if _, e = c.Write(answer); e != nil {
 						return
 					}

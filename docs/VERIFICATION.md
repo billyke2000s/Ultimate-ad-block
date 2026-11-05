@@ -56,3 +56,31 @@ A release requires a successful Android build/lint/test run, passing critical ru
 ## Verified v0.2.0 baseline
 Release source `042ab7a5d9dbd29b82bc452fb2a50252d3b362a9`: https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41549297575
 Both API 26/35 emulator jobs passed. The CI-only dnsprobe runs as a normal foreground app with a distinct UID and uses Android DNS APIs, ordinary name resolution and TCP connectivity. The parent test requires increased local blocked/allowed counters. Private DNS is disabled in the emulator test fixture. Physical-device and remaining scenarios above are still pending.
+
+
+## Experimental unified VPN checks
+
+```
+(cd native/go && go test -race -v -timeout 90s ./...)
+gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:assembleDebugAndroidTest :systemblock:lintDebug :dnsprobe:assembleDebug
+python3 scripts/check-blocklist.py
+```
+
+The native test uses two **real UDP WireGuard peers** on localhost with generated
+keys. It checks handshake, encrypted IPv4/IPv6 TCP, UDP/TCP DNS blocking, disabled
+blocking, hard-coded DNS, counters and worker termination. This is host-side
+protocol/bridge evidence, not Android socket protection or Internet egress proof.
+The Java suite adds 16 profile import/security cases (35 JUnit cases total).
+
+CI starts ephemeral Linux WireGuard and OpenVPN UDP/TCP servers with generated
+certificates and keys. `vpn-device-checks.sh` invokes cross-app Android probes after
+the original DNS-only/UI/persistence suite. These fixture secrets must not be
+uploaded with verification artifacts. Tests cover selected profile encryption,
+actual authenticated state, local VPN-only HTTP, ordinary Internet TCP, UDP/TCP
+DNS, blocking toggle without disconnect, reconnect and invalid authentication.
+Runtime success is recorded only after inspecting the corresponding CI job.
+
+Outstanding physical/provider matrix: distinct public egress IP (same-host emulator
+fixtures share an egress), real Wi-Fi/mobile handover, process-death lockdown,
+notification denial, background battery, true IPv6 Internet, permission revocation
+and existing-release signing compatibility. DNS-only client TCP remains unsupported.

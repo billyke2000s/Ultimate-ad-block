@@ -13,7 +13,7 @@ android {
   externalNativeBuild { cmake { cppFlags += "-std=c++20" } }
   testInstrumentationRunner = "com.example.systemblock.SmokeInstrumentation"
  }
- packaging { jniLibs.excludes += setOf("**/libwg-go.so", "**/libwg-quick.so") }
+ packaging { jniLibs.excludes += setOf("**/libwg-go.so", "**/libwg-quick.so", "**/libwg.so") }
  ndkVersion = "27.2.12479018"
  externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
 }

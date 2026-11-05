@@ -1,5 +1,9 @@
 name: Build AdBlock
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -31,6 +35,8 @@ jobs:
           timeout 15 openssl s_client -connect 1.1.1.1:443 -servername cloudflare-dns.com -showcerts </dev/null > systemblock/build/reports/resolver-chain.txt 2>&1 || true
           cat systemblock/build/reports/resolver-chain.txt
       - run: gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:assembleDebugAndroidTest :systemblock:lintDebug :dnsprobe:assembleDebug
+      - name: Verify APK contents
+        run: python3 scripts/check-apk.py
       - name: Print lint findings on failure
         if: failure()
         run: cat systemblock/build/reports/lint-results-debug.txt

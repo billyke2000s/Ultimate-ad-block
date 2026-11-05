@@ -23,7 +23,7 @@ final class VpnProfiles {
  VpnProfiles(Context c){file=new AtomicFile(new File(c.getNoBackupFilesDir(),"vpn-profiles.aes"));}
  private javax.crypto.SecretKey key()throws Exception{
   KeyStore ks=KeyStore.getInstance("AndroidKeyStore");ks.load(null);
-  if(!ks.containsAlias("adblock-vpn-v1")){KeyGenerator gen=KeyGenerator.getInstance("AES","AndroidKeyStore");gen.init(new KeyGenParameterSpec.Builder("adblock-vpn-v1",KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());gen.generateKey();}
+  if(!ks.containsAlias("adblock-vpn-v1")){KeyGenerator gen=KeyGenerator.getInstance("AES","AndroidKeyStore");gen.init(new KeyGenParameterSpec.Builder("adblock-vpn-v1",KeyProperties.PURPOSE_ENCRYPT|KeyProperties.PURPOSE_DECRYPT).setKeySize(256).setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build());gen.generateKey();}
   return (javax.crypto.SecretKey)ks.getKey("adblock-vpn-v1",null);
  }
  synchronized List<Profile> load()throws Exception{

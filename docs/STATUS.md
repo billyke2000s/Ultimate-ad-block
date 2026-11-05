@@ -142,3 +142,13 @@ Experimental source, **not production verified**. PR #1 remains draft.
 - Not yet verified: Android protocol connectivity, OpenVPN endpoint authentication,
   device VPN DNS/traffic leaks, real public-IP changes, mobile handover, process
   death/revocation, physical devices and update-signature compatibility.
+
+### CI finding and correction
+Build job at 6f7fe47 passed:
+https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41968707064
+Both API 26/35 jobs then failed before protocol tests: the existing gzip loader
+looked for blocklist.txt.gz, but Android's asset merger packages blocklist.txt.
+The loader now opens the packaged asset, with a gzip fallback for other packagers.
+Added check-apk.py to compare packaged rules byte-for-byte with the committed gzip
+and verify native ABI contents. This fixes an unverified 0.5.0 baseline startup
+fault; it does not replace missing VPN runtime evidence. Next CI run is required.
