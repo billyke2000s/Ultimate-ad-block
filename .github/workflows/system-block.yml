@@ -1,5 +1,9 @@
 name: Build AdBlock
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -7,6 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.3'
+          cache-dependency-path: native/go/go.sum
+      - name: Native packet and protocol tests
+        working-directory: native/go
+        run: go test -race ./...
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -22,6 +36,8 @@ jobs:
           timeout 15 openssl s_client -connect 1.1.1.1:443 -servername cloudflare-dns.com -showcerts </dev/null > systemblock/build/reports/resolver-chain.txt 2>&1 || true
           cat systemblock/build/reports/resolver-chain.txt
       - run: gradle --no-daemon :systemblock:testDebugUnitTest :systemblock:assembleDebug :systemblock:assembleDebugAndroidTest :systemblock:lintDebug :dnsprobe:assembleDebug
+      - name: Verify APK contents
+        run: python3 scripts/check-apk.py
       - name: Print lint findings on failure
         if: failure()
         run: cat systemblock/build/reports/lint-results-debug.txt
@@ -51,6 +67,9 @@ jobs:
         api: [26, 35]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: AdBlock-debug
@@ -63,6 +82,8 @@ jobs:
         with:
           name: dns-probe-apk
           path: apks
+      - name: Start controlled VPN endpoints
+        run: bash scripts/vpn-test-endpoints.sh
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -74,7 +95,9 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: bash scripts/systemblock-smoke.sh
+          script: |
+            bash scripts/systemblock-smoke.sh
+            bash scripts/vpn-device-checks.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -88,6 +111,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: AdBlock-debug
@@ -100,3 +126,33 @@ jobs:
           cp apks/systemblock-debug.apk AdBlock-v0.5.0.apk
           sha256sum AdBlock-v0.5.0.apk > SHA256SUMS.txt
           gh release create v0.5.0 AdBlock-v0.5.0.apk SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "AdBlock 0.5.0 — testing preview" --notes-file docs/RELEASE-0.5.0.md
+
+  prepare-experimental:
+    needs: [build, emulator]
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/unified-vpn-protocols'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: AdBlock-debug
+          path: apks
+      - name: Prepare experimental draft release after endpoint tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tag=v0.6.0-experimental.1
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Existing release preserved; no assets are overwritten."
+            exit 0
+          fi
+          test "$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/feature/unified-vpn-protocols --jq .object.sha)" = "$SOURCE_SHA"
+          cp apks/systemblock-debug.apk "AdBlock-$tag.apk"
+          sha256sum "AdBlock-$tag.apk" > SHA256SUMS.txt
+          printf '%s\n' "$SOURCE_SHA" > SOURCE.txt
+          gh release create "$tag" "AdBlock-$tag.apk" SHA256SUMS.txt SOURCE.txt --target "$SOURCE_SHA" --draft --prerelease --title "AdBlock 0.6.0 — experimental VPN preview" --notes-file docs/RELEASE-0.6.0-experimental.md

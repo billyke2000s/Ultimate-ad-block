@@ -98,6 +98,13 @@ Product: **AdBlock**. Published **v0.4.0 testing prerelease**.
 - Removed the Gradle asset dependency on the original browser module. Updater records exact feed versions/hashes; CI validates the committed bundle and connectivity/ad sentinels.
 - Offline bundle integrity check passed locally. Android build, lint, unit and API 26/35 integration checks pending for this revision.
 
+## Unified VPN development branch — 2026-11-05
+- Branch: `feature/unified-vpn-protocols`, draft PR #1.
+- Added `docs/UNIFIED_VPN_PLAN.md` specifying one-service WireGuard/OpenVPN integration, profile handling, DNS policies and acceptance tests.
+- Added a hamburger menu to Dashboard with navigation and clearly marked **coming soon** VPN/profile entries. Existing DNS-only VPN behaviour is unchanged.
+- **Not implemented:** WireGuard engine, OpenVPN engine, full traffic tunnel, profile import/storage, DNS integration for tunneled traffic, VPN connection status.
+- **Unverified:** build, tests, emulator, physical devices. Do not publish as functional VPN support until implemented and verified.
+
 ## Next work
 1. Run the remaining physical-device matrix in VERIFICATION; record models, Android versions, APK hash and exact cases.
 2. Implement and test client TCP DNS before broad DNS interoperability claims.
@@ -106,3 +113,96 @@ Product: **AdBlock**. Published **v0.4.0 testing prerelease**.
 
 ## Handoff discipline
 Read root AGENTS, this file and scoped instructions. Preserve the original browser module. Keep exact source SHA/run/device evidence; implemented, emulator-verified and physical-device-verified are different statuses. Do not replace these limits with “all apps”, “no ads”, “fully working” or invented device results.
+
+## Unified VPN implementation checkpoint — 2026-11-05
+
+Experimental source, **not production verified**. PR #1 remains draft.
+
+- Both engines are now integrated in-process behind the existing `BlockVpn`.
+  The WireGuard AAR's service and unused native libraries are explicitly excluded.
+- Added the shared Go/gVisor packet bridge, IPv4/IPv6 UDP/TCP DNS filtering,
+  authenticated protocol status, protected/network-bound transport sockets,
+  profile/server DNS through the tunnel and independent blocking toggle.
+- Added bounded .conf/.ovpn/relative-certificate ZIP import, encrypted multi-profile
+  persistence, name/config/authentication editing and compact hamburger navigation.
+- Remote routes remain installed on engine/setup failure while the service lives.
+  Android process death is a separate unresolved lockdown/always-on matrix; do not
+  claim crash-proof leak protection or enable lockdown for DNS-only mode.
+- Local controlled real UDP WireGuard peers passed handshake, IPv4/IPv6 ordinary
+  TCP, virtual and hard-coded UDP/TCP DNS filtering, disabled blocking, measured
+  traffic counters and shutdown under `go test -race` (12 DNS subcases).
+- Local Android build/assembly for arm64-v8a, armeabi-v7a, x86_64, 35 JUnit tests,
+  lint (0 errors, 8 warnings), test APK and dnsprobe assembly passed at the current
+  working checkpoint. Later revisions require a fresh result.
+- CI at f64265b passed native tests and failed Android lint on SOCK_CLOEXEC's API
+  level; replaced the unavailable Java API with a native socketpair. Checks were
+  not suppressed. New CI/runtime endpoint checks are pending.
+- Added CI-only generated WireGuard and OpenVPN UDP/TCP servers and cross-app
+  instrumentation. No server/provider keys are committed or bundled in the APK.
+- Not yet verified: Android protocol connectivity, OpenVPN endpoint authentication,
+  device VPN DNS/traffic leaks, real public-IP changes, mobile handover, process
+  death/revocation, physical devices and update-signature compatibility.
+
+### CI finding and correction
+Build job at 6f7fe47 passed:
+https://github.com/billyke2000s/Ultimate-ad-block/actions/runs/41968707064
+Both API 26/35 jobs then failed before protocol tests: the existing gzip loader
+looked for blocklist.txt.gz, but Android's asset merger packages blocklist.txt.
+The loader now opens the packaged asset, with a gzip fallback for other packagers.
+Added check-apk.py to compare packaged rules byte-for-byte with the committed gzip
+and verify native ABI contents. This fixes an unverified 0.5.0 baseline startup
+fault; it does not replace missing VPN runtime evidence. Next CI run is required.
+
+### Endpoint/lifecycle refinements
+Remote endpoint hostnames are now re-resolved through the non-VPN network on
+reconnect: OpenVPN uses its remote override callback, WireGuard refreshes peer
+configuration before rebinding protected sockets. Network changes are serialized
+with a bounded queue and prefer validated Wi-Fi when the VPN hides Android's
+default underlying network. Native startup failures cannot later appear connected
+merely because a WireGuard handshake exists without a working packet bridge.
+Added certificate-only and password-only controlled OpenVPN cases, explicit wrong
+password/certificate rejection assertions, and source-address validation at the
+controlled HTTP endpoint. These additions remain pending Android runtime results.
+
+### Second emulator finding
+At e058e2d, both API 26/35 original DNS-only, charts, activity and persistence
+suites passed. Both remote tests then stopped safely during native setup.
+ELF inspection found libubvpn.so depended on the build machine's absolute Go
+library path: Go c-shared output had no SONAME. Added the packaged libubgo.so
+SONAME and APK ELF dependency checks. This is a runtime packaging defect; neither
+protocol was marked Android-verified from a successful build alone.
+
+### Additional runtime acceptance assertions
+Added cross-app IPv6 HTTP source-address and IPv6 TCP DNS checks, plus direct
+IPv4/IPv6 TCP attempts that must fail after invalid authentication/certificates
+and deliberate termination of only the protocol engine. These keep the service
+alive to test retained routes. They are acceptance assertions, not claimed passes
+until their exact CI run is inspected. No production behavior changes in this step.
+
+### Controlled Android WireGuard progress
+At b27693c the Android service passed native loading and authenticated a real
+WireGuard peer on both APIs. The first cross-app probes then failed: API 26 timed
+out on external TCP from the assigned 10.89.0.2 address; API 35 saw a DNS network
+availability error during tunnel replacement. Added explicit runner FORWARD rules,
+waits for the actual VPN link addresses (not the initial guard), fresh controlled
+DNS queries with counter assertions, and post-VPN network/firewall diagnostics.
+The driver now runs every protocol/security case and reports all failures before
+exiting nonzero, rather than stopping at the first WireGuard failure. No failing
+assertion is removed or converted to a successful/skip result.
+
+### API 26 runtime evidence and remaining API 35 fault
+Run 41972160464: API 26 passed WireGuard, OpenVPN TCP with client certificate +
+password, and OpenVPN UDP certificate-only. Each passing case included real
+Internet TCP, VPN-only IPv4/IPv6 HTTP with a VPN client source address, IPv4/IPv6
+TCP DNS, UDP DNS, blocking toggled without reconnect, socket rebind/reconnect,
+measured counters and fail-closed engine termination. API 35 failed fresh DNS.
+Password-only cases incorrectly rejected the core's informational external-PKI
+flag even when client certificates were explicitly disabled. Matched the core's
+own condition, and prevented later network callbacks overwriting terminal errors.
+For API 35, retained former TUN descriptors until Android publishes the replacement
+interface in LinkProperties, rather than closing them during asynchronous route /
+resolver replacement. Next CI must verify that correction; no API 35 VPN pass yet.
+The workflow now checks out the exact PR head for reproducible source attribution.
+After all build and API 26/35 endpoint cases pass, it prepares (does not publish)
+an experimental draft release with APK, checksum and source SHA. An existing
+release is never overwritten. No draft is prepared while critical tests fail.

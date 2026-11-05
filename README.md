@@ -1,4 +1,25 @@
 <p align="center">
+
+**Experimental VPN branch:** WireGuard and OpenVPN engines now run inside AdBlock's
+single Android VPN service. Import profiles from **☰ → Import VPN Profile**, select
+one under **VPN Connections**, then connect. DNS blocking can be switched off
+independently. This branch is undergoing endpoint/device verification; see
+[STATUS](docs/STATUS.md) and [VPN verification](docs/VERIFICATION.md). It is not a
+production release. Existing DNS-only protection, 507,468 bundled rules, activity,
+charts and allowlists are retained.
+
+WireGuard: `.conf` with interface addresses, DNS, peers, endpoints and AllowedIPs.
+OpenVPN: `.ovpn` with embedded PEM certificates, or a ZIP containing one `.ovpn`
+and relative certificate files. Username/password and private-key password are
+editable in profile settings. Scripts, external PKI, compression and insecure TLS
+profiles are rejected. A VPN server/provider is required.
+
+Remote failures retain captured routes while the service lives. For protection
+against process death, configure Android Always-on VPN + Block connections without
+VPN **only with a remote profile selected**. DNS-only mode cannot forward ordinary
+traffic under Android lockdown. Private DNS/app-specific encrypted DNS can bypass
+domain filtering even though captured traffic remains inside the remote tunnel.
+
   <img src="docs/assets/ad-patrol.gif" width="1000" alt="AdBlock: a Nokia-era pixel snake loops around a green LCD screen, eating AD tiles." />
 </p>
 
@@ -98,11 +119,11 @@ Source for the published APK: [`ef5adc0`](https://github.com/billyke2000s/Ultima
 
 ## Know the edges
 
-- **One VPN slot.** This occupies Android's VPN slot and cannot run alongside another VPN in the same profile. It does not provide a remote privacy tunnel.
+- **One VPN slot.** This occupies Android's VPN slot and cannot run alongside another VPN in the same profile. The AdBlock-only mode does not provide a remote privacy tunnel; the experimental remote modes integrate their own engines.
 - **Domain filtering has limits.** Same-domain ads, including many YouTube ads, cannot be removed this way. There is no HTTPS interception or cosmetic filtering.
 - **Bypasses exist.** Android Private DNS, an app's own encrypted DNS, explicit network selection, hard-coded IPs and cached answers can bypass the filter.
 - **Client TCP DNS is pending.** Oversized UDP replies signal truncation; clients needing TCP may fail.
-- **Lockdown is unsupported.** Do not enable Android's “Block connections without VPN” setting for this DNS-only design.
+- **Lockdown is unsupported.** Do not enable Android's “Block connections without VPN” setting in AdBlock-only mode.
 - **Persistence is buffered.** Abrupt process death may lose recent statistics. A differently signed update may not install over an older build; uninstalling erases local settings and counters.
 
 ## Build it

@@ -17,3 +17,19 @@ https://github.com/StevenBlack/hosts
 HaGeZi Multi PRO, Pop-Up Ads and Threat Intelligence Feeds Medium — GPL-3.0 (see HaGeZi-GPL-3.0.txt).
 https://github.com/hagezi/dns-blocklists
 The blocklist.txt header preserves the specific source snapshots used.
+
+Unified VPN additions (experimental 0.6):
+- WireGuard Go: golang.zx2c4.com/wireguard v0.0.0-20250521234502-f333402bd9cb (MIT).
+- WireGuard Android config parser: com.wireguard.android:tunnel 1.0.20260102 (Apache-2.0).
+  Its VPN service and native backends are excluded; AdBlock uses only its parser.
+- OpenVPN 3: 0b27d9df493db8bc9dc459a2b1cb6b67037742b2, selected licence MPL-2.0.
+  Unmodified corresponding source: https://github.com/OpenVPN/openvpn3/tree/0b27d9df493db8bc9dc459a2b1cb6b67037742b2
+  Also pinned as native/deps/openvpn3 in this source repository.
+- Mbed TLS 3.6.5 (Apache-2.0 option); standalone ASIO 1.30.2 (Boost-1.0);
+  fmt 11.2.0 (MIT); LZ4 1.10.0 library (BSD-2-Clause).
+- gVisor 39ed1f5ac29c (Apache-2.0), Go 1.25.3 runtime and golang.org/x
+  crypto 0.37.0, net 0.39.0, sys 0.32.0, time 0.7.0 (BSD-3-Clause),
+  google/btree 1.1.2 (Apache-2.0).
+Full licence texts are in this directory. Dependency archives have SHA-256
+pins in CMakeLists.txt; Go dependencies and checksums are in native/go/go.sum.
+No OpenVPN/WireGuard server credentials are bundled in the production APK.

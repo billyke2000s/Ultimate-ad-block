@@ -18,3 +18,26 @@ GitHub Actions uploads a debug APK artifact. Debug signing is suitable for initi
 
 ## Inherited workflows and scripts
 Original browser workflows have `.disabled` suffixes and do not run. They are historical reference. The active workflow is `.github/workflows/system-block.yml`; `scripts/update-blocklist.sh` now refreshes AdBlock’s own bundle; other inherited scripts are reference material.
+
+
+## Experimental native VPN build
+
+Use `git clone --recurse-submodules` (or `git submodule update --init --recursive`),
+Go 1.25.3, NDK 27.2.12479018 and CMake 3.22.1. Gradle invokes scripts/build-go.sh,
+then CMake builds the JNI/OpenVPN engine for arm64-v8a, armeabi-v7a and x86_64.
+Native libraries use 16 KiB ELF alignment. API 26 and application ID are preserved.
+
+| Component | Exact pin | Licence |
+| --- | --- | --- |
+| WireGuard Go | v0.0.0-20250521234502-f333402bd9cb | MIT |
+| WireGuard Android parser | 1.0.20260102 | Apache-2.0 |
+| OpenVPN 3 | 0b27d9df493db8bc9dc459a2b1cb6b67037742b2 | MPL-2.0 selected |
+| gVisor | 39ed1f5ac29c | Apache-2.0 |
+| Mbed TLS | 3.6.5 | Apache-2.0 selected |
+| ASIO / fmt / LZ4 | 1.30.2 / 11.2.0 / 1.10.0 | Boost-1.0 / MIT / BSD-2-Clause |
+
+Go module checksums and CMake archive SHA-256 hashes pin downloaded dependencies.
+Full licences/notices are bundled in assets/licenses, with an immutable upstream
+OpenVPN source URL and submodule for corresponding source. No crypto library is
+replaced by an unverified binary download. Debug-signature compatibility with older
+release APKs is still not established; no production signing key is available here.

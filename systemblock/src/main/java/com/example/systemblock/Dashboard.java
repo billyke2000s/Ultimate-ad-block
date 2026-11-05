@@ -16,6 +16,8 @@ public final class Dashboard extends Activity {
  private static final int BG=0xff0d1016,CARD=0xff151a23,BORDER=0xff252c38;
  private static final int INK=0xfff3f5f9,MUTED=0xff919bad,GREEN=0xff77d9ad,BLUE=0xff91adff,ORANGE=0xffeab080;
  private LinearLayout root,body,nav,recent;
+ private TextView vpnState;
+ private final java.util.concurrent.ExecutorService profileWork=java.util.concurrent.Executors.newSingleThreadExecutor();
  private TextView heading,title,state,blocked,allowed,failed,rate;
  private Button toggle;
  private Chart chart;
@@ -42,15 +44,15 @@ public final class Dashboard extends Activity {
  private Button action(String text,boolean primary,Runnable run){Button b=new Button(this);b.setText(text);b.setTextSize(13);b.setAllCaps(false);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(44));b.setMinimumHeight(dp(44));b.setPadding(dp(10),dp(8),dp(10),dp(8));b.setTextColor(primary?BG:INK);b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(0x228ba7ff),surface(primary?BLUE:CARD,10),null));b.setOnClickListener(v->run.run());return b;}
  private void shell(){
   LinearLayout frame=column();frame.setBackgroundColor(BG);frame.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i.consumeSystemWindowInsets();});
-  LinearLayout toolbar=row();toolbar.setPadding(dp(18),dp(9),dp(18),dp(9));heading=label("AdBlock",22,INK,true);toolbar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));toolbar.addView(label("● LOCAL DNS",10,MUTED,true));frame.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(52)));
+  LinearLayout toolbar=row();toolbar.setPadding(dp(12),dp(9),dp(18),dp(9));Button menu=action("☰",false,this::openVpnMenu);menu.setTag("hamburger-menu");menu.setContentDescription("Open navigation and VPN options");toolbar.addView(menu,new LinearLayout.LayoutParams(dp(48),dp(44)));heading=label("AdBlock",22,INK,true);toolbar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));toolbar.addView(label("● ADBLOCK",10,MUTED,true));frame.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(52)));
   body=column();frame.addView(body,new LinearLayout.LayoutParams(-1,0,1));nav=row();nav.setPadding(dp(12),dp(6),dp(12),dp(6));nav.setBackgroundColor(CARD);
   String[] names={"Overview","Activity","Settings"};for(int i=0;i<3;i++){final int destination=i;navigation[i]=action(names[i],false,()->showPage(destination));navigation[i].setTag("nav-"+i);nav.addView(navigation[i],new LinearLayout.LayoutParams(0,dp(48),1));}frame.addView(nav);setContentView(frame);
  }
  void showPage(int destination){
   page=destination;body.removeAllViews();chart=null;state=null;adapter=null;activityList=null;recent=null;Arrays.fill(tabs,null);
   for(int i=0;i<3;i++){navigation[i].setSelected(i==page);navigation[i].setTextColor(i==page?BLUE:MUTED);navigation[i].setBackground(surface(i==page?0xff222c40:CARD,10));}
-  heading.setText(page==0?"AdBlock":page==1?"Activity":"Settings");
-  if(page==1){activity();}else{ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setVerticalScrollBarEnabled(false);root=column();root.setPadding(dp(16),dp(8),dp(16),dp(12));scroll.addView(root);body.addView(scroll,new LinearLayout.LayoutParams(-1,-1));if(page==0)overview();else settingsPage();}update();
+  heading.setText(page==0?"AdBlock":page==1?"Activity":page==3?"VPN Connections":"Settings");
+  if(page==1){activity();}else{ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setVerticalScrollBarEnabled(false);root=column();root.setPadding(dp(16),dp(8),dp(16),dp(12));scroll.addView(root);body.addView(scroll,new LinearLayout.LayoutParams(-1,-1));if(page==0)overview();else if(page==3)vpnPage();else settingsPage();}update();
  }
  private void overview(){
   LinearLayout protection=card(),statusRow=row(),copy=column();title=label("Protection is paused",18,INK,true);copy.addView(title);gap(copy,5);state=label("Ready to start",11,MUTED,false);state.setTag("protection-state");state.setMaxLines(2);state.setEllipsize(TextUtils.TruncateAt.END);copy.addView(state);statusRow.addView(copy,new LinearLayout.LayoutParams(0,-2,1));toggle=action("Start",true,this::toggleProtection);toggle.setTag("protection-toggle");LinearLayout.LayoutParams buttonParams=new LinearLayout.LayoutParams(dp(82),dp(44));buttonParams.leftMargin=dp(10);statusRow.addView(toggle,buttonParams);protection.addView(statusRow);root.addView(protection);gap(root,10);
@@ -87,13 +89,83 @@ public final class Dashboard extends Activity {
  }
  private void allowDomain(String host){String saved=getSharedPreferences("settings",0).getString("exceptions","");String value=saved.isEmpty()?host:saved+"\n"+host;getSharedPreferences("settings",0).edit().putString("exceptions",value).apply();Toast.makeText(this,"Allowed · restart protection to apply",Toast.LENGTH_LONG).show();}
  private void settingsPage(){
-  section("Filtering");setting("Allowed domains","Manage exceptions and subdomains",this::exceptions,"allowed-domains");setting("Private DNS","Open Android network settings",()->openSettings(android.provider.Settings.ACTION_WIRELESS_SETTINGS),null);setting("VPN settings","Manage Android VPN connections",()->openSettings("android.settings.VPN_SETTINGS"),null);gap(root,18);
+  section("Filtering");Switch blocking=new Switch(this);blocking.setText("Block domains");blocking.setTextColor(INK);blocking.setChecked(getSharedPreferences("settings",0).getBoolean("block_domains",true));blocking.setOnCheckedChangeListener((b,on)->getSharedPreferences("settings",0).edit().putBoolean("block_domains",on).apply());root.addView(blocking);setting("Allowed domains","Manage exceptions and subdomains",this::exceptions,"allowed-domains");setting("Private DNS","Open Android network settings",()->openSettings(android.provider.Settings.ACTION_WIRELESS_SETTINGS),null);setting("VPN settings","Manage Android VPN connections",()->openSettings("android.settings.VPN_SETTINGS"),null);gap(root,18);
   section("Activity & privacy");Switch recording=new Switch(this);recording.setText("Record recent domains");recording.setTextSize(14);recording.setTextColor(INK);recording.setPadding(dp(4),dp(14),dp(4),dp(14));recording.setChecked(Stats.get(this).isRecording());recording.setTag("record-activity");recording.setOnCheckedChangeListener((b,on)->Stats.get(this).setRecording(on));root.addView(recording);TextView disclosure=label("Stores the last 200 allowed, blocked and failed DNS queries on this device. Turn off to stop recording new entries.",12,MUTED,false);disclosure.setLineSpacing(dp(2),1);root.addView(disclosure);gap(root,8);
   setting("Clear recent activity","Delete query history; keep totals",()->new AlertDialog.Builder(this).setTitle("Clear activity?").setMessage("Deletes the saved recent-domain list from this device. Totals and exceptions stay saved.").setPositiveButton("Clear",(d,n)->{Stats.get(this).clearActivity();Toast.makeText(this,"Activity cleared",Toast.LENGTH_SHORT).show();}).setNegativeButton("Cancel",null).show(),null);
-  setting("Reset all statistics","Clear totals, charts and recent queries",this::reset,null);gap(root,18);section("About");setting("How protection works","Privacy, DNS and filtering limits",this::about,"about");gap(root,12);root.addView(label("AdBlock 0.5.0\nOn-device filtering by Obskyra",11,MUTED,false));
+  setting("Reset all statistics","Clear totals, charts and recent queries",this::reset,null);gap(root,18);section("About");setting("How protection works","Privacy, DNS and filtering limits",this::about,"about");gap(root,12);root.addView(label("AdBlock 0.6.0 experimental\nOn-device filtering by Obskyra",11,MUTED,false));
  }
  private void section(String text){TextView t=label(text.toUpperCase(Locale.UK),11,BLUE,true);t.setLetterSpacing(.08f);root.addView(t);gap(root,4);}
  private void setting(String name,String description,Runnable run,String tag){LinearLayout item=row();item.setPadding(dp(4),dp(13),dp(4),dp(13));LinearLayout copy=column();copy.addView(label(name,14,INK,true));gap(copy,4);copy.addView(label(description,11,MUTED,false));item.addView(copy,new LinearLayout.LayoutParams(0,-2,1));item.addView(label("›",22,MUTED,false));item.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(0x228ba7ff),null,null));item.setOnClickListener(v->run.run());item.setFocusable(true);item.setTag(tag);root.addView(item);View divider=new View(this);divider.setBackgroundColor(BORDER);root.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));}
+ private void openVpnMenu(){
+  String[] options={"Dashboard","VPN Connections","Import VPN Profile","VPN Settings","AdBlock Settings","Activity & Statistics","Privacy & Diagnostics"};
+  new AlertDialog.Builder(this).setTitle("AdBlock").setItems(options,(dialog,which)->{
+   switch(which){case 0:showPage(0);break;case 1:showPage(3);break;case 2:importProfile();break;case 3:vpnSettings();break;case 4:showPage(2);break;case 5:showPage(1);break;default:diagnostics();}
+  }).setNegativeButton("Close",null).show();
+ }
+ private void profileFailure(String message){if(!isFinishing()&&!isDestroyed())new AlertDialog.Builder(this).setTitle("VPN profile").setMessage(message).setPositiveButton("OK",null).show();}
+ private void importProfile(){
+  Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);
+  try{startActivityForResult(picker,3);}catch(ActivityNotFoundException e){profileFailure("No document picker is available on this device.");}
+ }
+ private void imported(android.net.Uri uri){
+  profileWork.execute(()->{try{
+   String name="VPN";try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}
+   String text;boolean zip=name.toLowerCase(Locale.ROOT).endsWith(".zip");try(java.io.InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new java.io.IOException();text=zip?OpenProfile.fromZip(in):new String(OpenProfile.read(in,OpenProfile.LIMIT),java.nio.charset.StandardCharsets.UTF_8);}
+   boolean wg=!zip&&java.util.regex.Pattern.compile("(?im)^\\s*\\[Interface\\]\\s*$").matcher(text).find();if(wg)NativeSession.wireguard(text);else text=OpenProfile.validate(text);
+   VpnProfiles store=new VpnProfiles(this);java.util.List<VpnProfiles.Profile> profiles=store.load();VpnProfiles.Profile p=new VpnProfiles.Profile(wg?"WireGuard":"OpenVPN",text);p.name=name.replaceFirst("(?i)\\.(conf|ovpn|zip)$","");profiles.add(p);store.save(profiles);
+   runOnUiThread(()->{showPage(3);Toast.makeText(this,"Profile imported securely",Toast.LENGTH_SHORT).show();});
+  }catch(Exception e){runOnUiThread(()->profileFailure(e instanceof java.io.IOException&&e.getMessage()!=null?e.getMessage():"Import failed. Check profile format, certificate bundle and secure storage."));}});
+ }
+ private void vpnPage(){
+  LinearLayout panel=card();vpnState=label("",13,INK,true);panel.addView(vpnState);gap(panel,8);
+  panel.addView(action("Disconnect",false,()->startService(new Intent(this,BlockVpn.class).setAction("stop"))));root.addView(panel);gap(root,8);
+  String selected=getSharedPreferences("settings",0).getString("vpn_profile","");
+  setting("AdBlock only"+(selected.isEmpty()?" · Selected":""),"DNS filtering without a remote VPN",()->chooseProfile(""),null);
+  profileWork.execute(()->{try{java.util.List<VpnProfiles.Profile> profiles=new VpnProfiles(this).load();runOnUiThread(()->{if(page!=3||isDestroyed())return;for(VpnProfiles.Profile p:profiles)setting(p.name+(p.id.equals(selected)?" · Selected":""),p.protocol+" · tap for connect, edit or delete",()->profileActions(p),null);setting("Import VPN profile","WireGuard .conf, OpenVPN .ovpn or certificate ZIP",this::importProfile,null);});}catch(Exception e){runOnUiThread(()->profileFailure("Encrypted profiles could not be opened. Existing data has been preserved."));}});
+  gap(root,12);root.addView(label("Split tunnels send traffic outside included routes directly. Unexpected failures keep included routes blocked. Disconnect releases the VPN routes.",11,MUTED,false));updateVpn();
+ }
+ private void chooseProfile(String id){
+  if(!BlockVpn.status.startsWith("Stopped")){Toast.makeText(this,"Disconnect before selecting a different mode or profile",Toast.LENGTH_LONG).show();return;}
+  getSharedPreferences("settings",0).edit().putString("vpn_profile",id).apply();showPage(3);
+ }
+ private void profileActions(VpnProfiles.Profile p){
+  new AlertDialog.Builder(this).setTitle(p.name+" · "+p.protocol).setItems(new String[]{"Select","Connect","Edit name & credentials","Edit configuration","Delete"},(d,n)->{
+   if(n==0){chooseProfile(p.id);}else if(n==1){if(!BlockVpn.status.startsWith("Stopped")){Toast.makeText(this,"Disconnect the active connection first",Toast.LENGTH_LONG).show();return;}chooseProfile(p.id);Intent consent=VpnService.prepare(this);if(consent!=null)startActivityForResult(consent,1);else start();}
+   else if(n==2)editProfile(p,false);else if(n==3)editProfile(p,true);else new AlertDialog.Builder(this).setTitle("Delete "+p.name+"?").setMessage("Removes this profile and its stored credentials.").setPositiveButton("Delete",(x,y)->saveProfile(p,true)).setNegativeButton("Cancel",null).show();
+  }).show();
+ }
+ private void editProfile(VpnProfiles.Profile p,boolean config){
+  if(BlockVpn.running){Toast.makeText(this,"Disconnect before editing profiles",Toast.LENGTH_LONG).show();return;}
+  getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+  LinearLayout form=column();form.setPadding(dp(20),dp(8),dp(20),0);
+  EditText name=new EditText(this);name.setSingleLine();name.setHint("Profile name");name.setText(p.name);
+  EditText user=new EditText(this);user.setSingleLine();user.setHint("Username");user.setText(p.user);
+  EditText password=new EditText(this);password.setSingleLine();password.setInputType(129);password.setHint("Password");password.setText(p.password);
+  EditText keyPassword=new EditText(this);keyPassword.setSingleLine();keyPassword.setInputType(129);keyPassword.setHint("Private-key password (optional)");keyPassword.setText(p.keyPassword);
+  EditText content=new EditText(this);content.setTextSize(12);content.setGravity(Gravity.TOP);content.setInputType(0x80001|0x20000);content.setText(p.config);
+  if(config)form.addView(content,new LinearLayout.LayoutParams(-1,dp(260)));else{form.addView(name);if(p.protocol.equals("OpenVPN")){form.addView(user);form.addView(password);form.addView(keyPassword);}}
+  AlertDialog dialog=new AlertDialog.Builder(this).setTitle(config?"Configuration":"Profile settings").setView(form).setPositiveButton("Save",null).setNegativeButton("Cancel",null).create();
+  dialog.setOnDismissListener(x->getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE));dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+   String value=content.getText().toString(),profileName=name.getText().toString().trim(),username=user.getText().toString(),pass=password.getText().toString(),keyPass=keyPassword.getText().toString();profileWork.execute(()->{try{if(config){if(p.protocol.equals("WireGuard"))NativeSession.wireguard(value);else valueValidation(value);}if(config)p.config=p.protocol.equals("OpenVPN")?OpenProfile.validate(value):value;else{p.name=profileName;p.user=username;p.password=pass;p.keyPassword=keyPass;}runOnUiThread(()->{dialog.dismiss();saveProfile(p,false);});}catch(Exception error){runOnUiThread(()->profileFailure("Configuration rejected. Check keys, addresses, DNS, certificates and supported directives."));}});
+  }));dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);dialog.show();
+ }
+ private void valueValidation(String value)throws java.io.IOException{OpenProfile.validate(value);}
+ private void saveProfile(VpnProfiles.Profile p,boolean delete){
+  if(!BlockVpn.status.startsWith("Stopped")){Toast.makeText(this,"Disconnect before changing saved profiles",Toast.LENGTH_LONG).show();return;}
+  profileWork.execute(()->{try{VpnProfiles store=new VpnProfiles(this);java.util.List<VpnProfiles.Profile> profiles=store.load();for(int i=0;i<profiles.size();i++)if(profiles.get(i).id.equals(p.id)){if(delete)profiles.remove(i);else profiles.set(i,p);break;}store.save(profiles);if(delete&&p.id.equals(getSharedPreferences("settings",0).getString("vpn_profile","")))getSharedPreferences("settings",0).edit().putString("vpn_profile","").apply();runOnUiThread(()->showPage(3));}catch(Exception e){runOnUiThread(()->profileFailure("Profile could not be saved. Existing encrypted data has been preserved."));}});
+ }
+ private void vpnSettings(){
+  new AlertDialog.Builder(this).setTitle("VPN Settings").setMessage("Failure policy: fail closed. Remote failures retain captured routes until you disconnect. Split-tunnel routes remain a deliberate bypass. For protection after process death, enable Android Always-on VPN and Block connections without VPN while a remote profile is selected. Keep those settings off in AdBlock-only mode.\n\nDNS policy: the profile/server DNS resolvers are used through the encrypted tunnel. DNS host routes are included even for split tunnels. No public resolver fallback. Profiles without DNS are rejected. VPN server hostnames are bootstrapped through the underlying network.\n\nDisable Android Private DNS and app-specific encrypted DNS if you want domain filtering. Those encrypted lookups cannot be inspected. A VPN provider/server is required.").setPositiveButton("VPN connections",(d,n)->showPage(3)).setNeutralButton("Android VPN settings",(d,n)->openSettings("android.settings.VPN_SETTINGS")).setNegativeButton("Close",null).show();
+ }
+ private void diagnostics(){
+  NativeSession session=BlockVpn.activeSession;
+  new AlertDialog.Builder(this).setTitle("Privacy & Diagnostics").setMessage("State: "+BlockVpn.status+"\nProtocol: "+(session==null?"AdBlock only":session.protocol())+"\n\nProfiles use app-private, Keystore-backed AES-GCM encryption. DNS history remains local. No telemetry or query uploads. No TLS interception.\n\nRemote VPN mode is experimental. Engine and device verification are tracked separately; an interface alone does not prove a working connection.").setPositiveButton("Close",null).show();
+ }
+ private void updateVpn(){
+  if(page!=3||vpnState==null)return;NativeSession s=BlockVpn.activeSession;String info=BlockVpn.status;
+  if(s!=null){long duration=s.connectedSince==0?0:(SystemClock.elapsedRealtime()-s.connectedSince)/1000;info=s.protocol()+" · "+info+"\n"+s.server+" · "+duration+"s\nTunnel IP bytes ↓ "+s.bytes(true)+"  ↑ "+s.bytes(false);}
+  vpnState.setText(info);
+ }
  private void toggleProtection(){
   if(BlockVpn.running){startService(new Intent(this,BlockVpn.class).setAction("stop"));update();return;}
   String status=BlockVpn.status;
@@ -110,12 +182,12 @@ public final class Dashboard extends Activity {
  }
  private void reset(){new AlertDialog.Builder(this).setTitle("Reset statistics?").setMessage("Clears saved query totals and domain history on this device. Your allowed domains stay saved.").setPositiveButton("Reset",(d,n)->{Stats.get(this).clear();update();}).setNegativeButton("Cancel",null).show();}
  private void about(){
-  TextView body=label("A local DNS filter\n\nAd and tracker domains are checked against bundled rules. Normal internet traffic goes directly to its destination. Allowed DNS queries go to Cloudflare using certificate-verified HTTPS, with no plaintext fallback. The resolver can see those queries.\n\nYour controls\n\nOnly one VPN can run per Android profile. Do not enable ‘Block connections without VPN’: this DNS-only service does not carry all traffic.\n\nWhat can bypass it\n\nSame-domain ads cannot be removed by domain filtering. Android Private DNS, an app’s encrypted DNS, hard-coded IPs, cached answers and explicitly selecting another network can bypass this filter. Client TCP DNS is not supported; large UDP answers are truncated and clients needing TCP may fail.\n\nYour statistics\n\nCounts represent DNS queries, not individual ads or bytes saved. Statistics stay on this device, with up to 200 blocked-domain counters, 90 daily entries and 200 recent queries (domain, result and time). Recent queries include allowed domains; recording can be disabled and the history cleared in Settings. Recent increments may be lost after abrupt process death.",15,INK,false);
+  TextView body=label("DNS filtering and optional VPN\n\nAd and tracker domains are checked against bundled rules. In AdBlock-only mode, normal traffic goes directly to its destination and allowed DNS uses certificate-verified Cloudflare HTTPS with no plaintext fallback. In remote mode, captured traffic and allowed DNS use your selected VPN server. The server/resolver can observe the corresponding traffic.\n\nYour controls\n\nOnly one VPN can run per Android profile. AdBlock-only mode cannot carry ordinary traffic under Android lockdown. With a remote profile selected, Always-on VPN and Block connections without VPN can enforce protection after process death.\n\nWhat can bypass it\n\nSame-domain ads cannot be removed by domain filtering. Android Private DNS, an app’s encrypted DNS, hard-coded IPs, cached answers and explicitly selecting another network can bypass this filter. In AdBlock-only mode, client TCP DNS is not supported; large UDP answers are truncated and clients needing TCP may fail.\n\nYour statistics\n\nCounts represent DNS queries, not individual ads or bytes saved. Statistics stay on this device, with up to 200 blocked-domain counters, 90 daily entries and 200 recent queries (domain, result and time). Recent queries include allowed domains; recording can be disabled and the history cleared in Settings. Recent increments may be lost after abrupt process death.",15,INK,false);
   body.setPadding(dp(24),dp(12),dp(24),dp(24));body.setLineSpacing(dp(4),1);ScrollView scroll=new ScrollView(this);scroll.addView(body);
   new AlertDialog.Builder(this).setTitle("How protection works").setView(scroll).setPositiveButton("Got it",null).show();
  }
  void start(){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},2);startForegroundService(new Intent(this,BlockVpn.class));handler.postDelayed(this::update,100);}
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==1&&result==RESULT_OK)start();}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==1&&result==RESULT_OK)start();if(request==3&&result==RESULT_OK&&data!=null&&data.getData()!=null)imported(data.getData());}
  @Override protected void onResume(){super.onResume();handler.removeCallbacks(refresh);handler.post(refresh);}
  @Override protected void onPause(){handler.removeCallbacks(refresh);Stats.get(this).save();super.onPause();}
  @Override protected void onSaveInstanceState(Bundle out){out.putInt("chartMode",mode);out.putInt("page",page);out.putInt("filter",filter);out.putString("search",search);super.onSaveInstanceState(out);}
@@ -132,7 +204,7 @@ public final class Dashboard extends Activity {
   }
  }
  void update(){
-  if(page==1){refreshActivity();return;}if(page!=0||state==null)return;
+  if(page==3){updateVpn();return;}if(page==1){refreshActivity();return;}if(page!=0||state==null)return;
   String status=BlockVpn.status;boolean active=BlockVpn.running,stopped=status.startsWith("Stopped"),stopping=status.startsWith("Stopping")||status.startsWith("Restarting"),error=status.startsWith("DNS upstream unavailable");
   title.setText(error?"DNS needs attention":stopping?"Pausing…":active?"Protection is on":stopped?"Protection is paused":"Starting…");
   state.setText(status.equals("Stopped")?"Filter ad and tracker domains":status.replace("Filtering · ",""));
