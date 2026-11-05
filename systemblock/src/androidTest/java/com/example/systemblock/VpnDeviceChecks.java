@@ -27,7 +27,8 @@ final class VpnDeviceChecks {
    while(SystemClock.elapsedRealtime()<until){NativeSession session=BlockVpn.activeSession;connected=session!=null&&session.connectedSince>0;if(connected)break;if(Boolean.parseBoolean(args.getString("bad_auth","false"))&&BlockVpn.status.contains("AUTH FAILED"))break;if(Boolean.parseBoolean(args.getString("bad_cert","false"))&&BlockVpn.status.contains("CERT"))break;Thread.sleep(250);}
    if(Boolean.parseBoolean(args.getString("bad_auth","false"))||Boolean.parseBoolean(args.getString("bad_cert","false"))){if(connected)throw new AssertionError("Invalid credentials/certificate connected");if(Boolean.parseBoolean(args.getString("bad_auth","false"))&&!BlockVpn.status.contains("AUTH FAILED"))throw new AssertionError("No authentication rejection: "+BlockVpn.status);if(Boolean.parseBoolean(args.getString("bad_cert","false"))&&!BlockVpn.status.contains("CERT VERIFY FAIL"))throw new AssertionError("No certificate rejection: "+BlockVpn.status);if(!BlockVpn.running)throw new AssertionError("Failure removed fail-closed VPN");verifyClosed();return;}
    if(!connected)throw new AssertionError("No authenticated connection: "+BlockVpn.status);
-   runProbe(ip,true);
+   Stats counts=Stats.get(context);long blockedBefore,allowedBefore;synchronized(counts){blockedBefore=counts.blocked;allowedBefore=counts.allowed;}
+   runProbe(ip,true);synchronized(counts){if(counts.blocked<=blockedBefore||counts.allowed<=allowedBefore)throw new AssertionError("Remote DNS did not traverse DomainRules and Stats");}
    NativeSession session=BlockVpn.activeSession;long started=session.connectedSince;settings.edit().putBoolean("block_domains",false).commit();runProbe(ip,false);
    if(session!=BlockVpn.activeSession||session.connectedSince!=started)throw new AssertionError("Blocking toggle restarted VPN");
    if(session.bytes(true)<=0||session.bytes(false)<=0)throw new AssertionError("No actual forwarded byte counters");

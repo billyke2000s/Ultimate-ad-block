@@ -18,11 +18,14 @@ public final class DnsProbe extends Activity {
   String result;
   try{
    if(checkSelfPermission(android.Manifest.permission.INTERNET)!=android.content.pm.PackageManager.PERMISSION_GRANTED)throw new AssertionError("Probe INTERNET permission missing");
+   String remoteServer=getIntent().getStringExtra("remote_ip");
    ConnectivityManager cm=getSystemService(ConnectivityManager.class);
-   long until=SystemClock.elapsedRealtime()+10000;boolean ready=false;
+   long until=SystemClock.elapsedRealtime()+10000,readySince=0;boolean ready=false;
    while(!ready && SystemClock.elapsedRealtime()<until){
     Network network=cm.getActiveNetwork();NetworkCapabilities caps=network==null?null:cm.getNetworkCapabilities(network);
     ready=caps!=null && caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN);
+    if(ready&&remoteServer!=null){LinkProperties links=cm.getLinkProperties(network);String prefix=remoteServer.substring(0,remoteServer.lastIndexOf('.')+1);boolean assigned=false;if(links!=null&&!links.getDnsServers().isEmpty())for(LinkAddress a:links.getLinkAddresses())if(a.getAddress().getHostAddress().startsWith(prefix))assigned=true;ready=assigned;}
+    if(ready){if(readySince==0)readySince=SystemClock.elapsedRealtime();ready=SystemClock.elapsedRealtime()-readySince>=500;}else readySince=0;
     if(!ready)Thread.sleep(50);
    }
    if(!ready)throw new AssertionError("VPN not assigned to other app");
@@ -30,6 +33,7 @@ public final class DnsProbe extends Activity {
    String blocked="probe-"+System.nanoTime()+".doubleclick.net";
    boolean blocking=getIntent().getBooleanExtra("blocking",true);
    if(lookup(blocked)==blocking)throw new AssertionError("Blocking policy disagrees with DNS outcome");
+   if(remoteServer!=null&&!lookup("probe-"+System.nanoTime()+".allowed.test"))throw new AssertionError("Fresh controlled DNS lookup failed");
    if(!lookup("example.com"))throw new AssertionError("Allowed domain did not resolve");
    InetAddress[] normal=InetAddress.getAllByName("example.com");
    if(normal.length==0)throw new AssertionError("Ordinary app resolution failed");

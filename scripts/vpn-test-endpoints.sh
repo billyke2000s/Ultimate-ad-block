@@ -95,9 +95,14 @@ Endpoint = 10.0.2.2:51820
 AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 2
 EOF_WG
+# Docker-enabled hosted runners may default FORWARD to DROP.
+for interface in ubwg ovpn86 ovpn87 ovpn88; do
+ sudo iptables -I FORWARD 1 -i "$interface" -j ACCEPT
+ sudo iptables -I FORWARD 1 -o "$interface" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+done
 # Restrict the DNS fixture to VPN interfaces. Real Internet lookups still forward normally.
 for i in $(seq 1 50); do if ip link show ovpn87 >/dev/null 2>&1 && ip link show ovpn88 >/dev/null 2>&1 && ip link show ovpn86 >/dev/null 2>&1; then break; fi;sleep .1;done
-sudo dnsmasq --no-daemon --bind-dynamic --interface=ubwg --interface=ovpn87 --interface=ovpn88 --interface=ovpn86 --except-interface=lo --no-resolv --server=1.1.1.1 --address=/doubleclick.net/10.89.0.1 --log-facility="$out/dnsmasq.log" &
+sudo dnsmasq --no-daemon --bind-dynamic --interface=ubwg --interface=ovpn87 --interface=ovpn88 --interface=ovpn86 --except-interface=lo --no-resolv --server=1.1.1.1 --address=/doubleclick.net/10.89.0.1 --address=/allowed.test/10.89.0.1 --log-facility="$out/dnsmasq.log" &
 printf '%s\n' "$!" > dnsmasq.pid
 cat > endpoint.py <<'PY'
 import http.server,socketserver,threading,socket

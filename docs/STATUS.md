@@ -178,3 +178,14 @@ IPv4/IPv6 TCP attempts that must fail after invalid authentication/certificates
 and deliberate termination of only the protocol engine. These keep the service
 alive to test retained routes. They are acceptance assertions, not claimed passes
 until their exact CI run is inspected. No production behavior changes in this step.
+
+### Controlled Android WireGuard progress
+At b27693c the Android service passed native loading and authenticated a real
+WireGuard peer on both APIs. The first cross-app probes then failed: API 26 timed
+out on external TCP from the assigned 10.89.0.2 address; API 35 saw a DNS network
+availability error during tunnel replacement. Added explicit runner FORWARD rules,
+waits for the actual VPN link addresses (not the initial guard), fresh controlled
+DNS queries with counter assertions, and post-VPN network/firewall diagnostics.
+The driver now runs every protocol/security case and reports all failures before
+exiting nonzero, rather than stopping at the first WireGuard failure. No failing
+assertion is removed or converted to a successful/skip result.
