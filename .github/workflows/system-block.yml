@@ -7,6 +7,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.3'
+          cache-dependency-path: native/go/go.sum
+      - name: Native packet and protocol tests
+        working-directory: native/go
+        run: go test -race ./...
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -51,6 +60,8 @@ jobs:
         api: [26, 35]
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/download-artifact@v4
         with:
           name: AdBlock-debug
@@ -88,6 +99,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/download-artifact@v4
         with:
           name: AdBlock-debug

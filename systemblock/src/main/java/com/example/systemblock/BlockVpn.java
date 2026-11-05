@@ -2,7 +2,8 @@ package com.example.systemblock;
 
 import android.app.*;
 import android.content.*;
-import android.net.VpnService;
+import android.net.*;
+import java.net.*;
 import android.os.*;
 import android.system.OsConstants;
 import android.system.Os;
@@ -14,6 +15,11 @@ import java.util.concurrent.*;
 public final class BlockVpn extends VpnService {
  static volatile boolean running;
  static volatile String status="Stopped";
+ static volatile NativeSession activeSession;
+ private volatile NativeSession remote;
+ private ParcelFileDescriptor guard;
+ private ConnectivityManager.NetworkCallback networks;
+ private volatile Network network;
  private final Object lifecycle=new Object();
  private volatile boolean stopping;
  private boolean restartRequested;
@@ -42,6 +48,8 @@ public final class BlockVpn extends VpnService {
  private void readTunnel(){
   try{
    DomainRules loaded=new DomainRules(new java.util.zip.GZIPInputStream(getAssets().open("blocklist.txt.gz")),getSharedPreferences("settings",MODE_PRIVATE).getString("exceptions",""));
+   String selected=getSharedPreferences("settings",MODE_PRIVATE).getString("vpn_profile","");
+   if(!selected.isEmpty()){runRemote(loaded,selected);return;}
    FileInputStream input;
    synchronized(lifecycle){
     if(stopping)return;
@@ -67,7 +75,7 @@ public final class BlockVpn extends VpnService {
     int n=owned.read(buffer);if(n<=0)break;
     byte[] packet=Arrays.copyOf(buffer,n),query=DnsPacket.query(packet,n);
     if(query==null)continue;
-    if(rules.blocks(DnsPacket.host(query))){complete(packet,query,DnsPacket.error(query,3),1);continue;}
+    if(getSharedPreferences("settings",MODE_PRIVATE).getBoolean("block_domains",true)&&rules.blocks(DnsPacket.host(query))){complete(packet,query,DnsPacket.error(query,3),1);continue;}
     try{workers.execute(()->resolve(packet,query));}
     catch(RejectedExecutionException busy){complete(packet,query,DnsPacket.error(query,2),-1);}
    }
@@ -75,6 +83,37 @@ public final class BlockVpn extends VpnService {
   }catch(Exception e){synchronized(lifecycle){if(!stopping)status="Stopped: "+e.getClass().getSimpleName();}}
   finally{shutdown();}
  }
+ Network underlying(){
+  ConnectivityManager cm=getSystemService(ConnectivityManager.class);
+  Network active=cm.getActiveNetwork();NetworkCapabilities cap=cm.getNetworkCapabilities(active);
+  if(cap!=null&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN))return active;
+  if(network!=null)return network;
+  for(Network n:cm.getAllNetworks()){cap=cm.getNetworkCapabilities(n);if(cap!=null&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN))return n;}
+  return null;
+ }
+ boolean protectRemote(int fd){
+  try{if(!protect(fd))return false;Network n=underlying();if(n==null)return false;try(ParcelFileDescriptor owned=ParcelFileDescriptor.fromFd(fd)){n.bindSocket(owned.getFileDescriptor());}return true;}catch(IOException e){return false;}
+ }
+ private void runRemote(DomainRules loaded,String selected)throws Exception{
+
+  synchronized(lifecycle){
+   if(stopping)return;
+   // Hold both families before handshaking. Never release routes on engine failure.
+   guard=new Builder().setSession("AdBlock · connecting").setMtu(1280).addAddress("10.111.0.1",32).addAddress("fd11:111::1",128).addRoute("0.0.0.0",0).addRoute("::",0).addDnsServer("10.111.0.2").setBlocking(false).establish();
+   if(guard==null)throw new IOException("VPN permission revoked");
+   rules=loaded;running=true;status="Connecting VPN — traffic blocked";
+  }
+  ConnectivityManager cm=getSystemService(ConnectivityManager.class);
+  networks=new ConnectivityManager.NetworkCallback(){
+   @Override public void onAvailable(Network n){network=n;setUnderlyingNetworks(new Network[]{n});NativeSession session=remote;if(session!=null)new Thread(session::networkChanged,"vpn-network").start();}
+   @Override public void onLost(Network n){if(n.equals(network)){network=null;NativeSession session=remote;if(session!=null)new Thread(session::networkChanged,"vpn-network").start();}}
+  };
+  cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN).build(),networks);
+  try{VpnProfiles.Profile profile=new VpnProfiles(this).find(selected);synchronized(lifecycle){if(stopping)return;remote=new NativeSession(this,loaded,profile);activeSession=remote;}remote.start();}catch(Exception|LinkageError failure){remoteStatus("VPN setup failed — traffic blocked. Check profile, DNS and network.");}
+  while(!stopping){NativeSession session=remote;if(session!=null)session.poll();Thread.sleep(1500);}
+ }
+ void remoteStatus(String value){synchronized(lifecycle){if(!stopping)status=value;}}
+ void releaseGuard(){synchronized(lifecycle){if(guard!=null)try{guard.close();}catch(IOException ignored){}guard=null;}}
  private void resolve(byte[] packet,byte[] query){
   if(stopping)return;
   try{
@@ -104,11 +143,15 @@ public final class BlockVpn extends VpnService {
    java.util.List<TlsDns> closing=new ArrayList<>(resolvers);resolvers.clear();
    if(output!=null)try{output.close();}catch(IOException ignored){}output=null;
    if(tunnel!=null){try{tunnel.close();}catch(IOException ignored){}tunnel=null;}
+   NativeSession session=remote;remote=null;activeSession=null;
+   if(networks!=null){getSystemService(ConnectivityManager.class).unregisterNetworkCallback(networks);networks=null;}
    ThreadPoolExecutor executor=workers;Thread oldReader=reader;
    if(oldReader!=null && oldReader!=Thread.currentThread())oldReader.interrupt();
    // TLS close_notify may write to the network on Android 8. Never close TLS on main.
    new Thread(()->{
     try{
+     if(session!=null)session.close();
+     releaseGuard();
      if(executor!=null)executor.shutdownNow();
      for(TlsDns resolver:closing)try{resolver.close();}catch(RuntimeException e){android.util.Log.w("SystemBlock","Resolver shutdown failed: "+e);}
      if(oldReader!=null && oldReader!=Thread.currentThread())try{oldReader.join(1000);}catch(InterruptedException e){Thread.currentThread().interrupt();}

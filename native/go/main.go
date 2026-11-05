@@ -34,7 +34,13 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 	"gvisor.dev/gvisor/pkg/tcpip/transport/tcp"
 	"gvisor.dev/gvisor/pkg/tcpip/transport/udp"
+	"gvisor.dev/gvisor/pkg/waiter"
 )
+
+func packetFile(fd int, name string) *os.File {
+	unix.SetNonblock(fd, true)
+	return os.NewFile(uintptr(fd), name)
+}
 
 // Datagram socket adapter; unlike an OS TUN this never performs TUN ioctls.
 type packetDevice struct {
@@ -104,7 +110,7 @@ var bridges = map[int64]*bridge{}
 
 //export UBWgStart
 func UBWgStart(fd C.int, mtu C.int, config *C.char, protect, ctx C.uintptr_t) C.longlong {
-	p := &packetDevice{f: os.NewFile(uintptr(fd), "wg-packets"), events: make(chan tun.Event, 2), mtu: int(mtu)}
+	p := &packetDevice{f: packetFile(int(fd), "wg-packets"), events: make(chan tun.Event, 2), mtu: int(mtu)}
 	b := &safeBind{Bind: conn.NewDefaultBind(), protect: protect, ctx: ctx}
 	d := device.NewDevice(p, b, device.NewLogger(device.LogLevelSilent, ""))
 	if e := d.IpcSet(C.GoString(config)); e != nil {
@@ -221,7 +227,11 @@ func addr(ip netip.Addr, port uint16) (tcpip.FullAddress, tcpip.NetworkProtocolN
 	if ip.Is6() {
 		proto = ipv6.ProtocolNumber
 	}
-	return tcpip.FullAddress{NIC: 1, Addr: tcpip.AddrFromSlice(ip.AsSlice()), Port: port}, proto
+	a := tcpip.FullAddress{NIC: 1, Port: port}
+	if !ip.IsUnspecified() {
+		a.Addr = tcpip.AddrFromSlice(ip.AsSlice())
+	}
+	return a, proto
 }
 
 var virtual4 = netip.MustParseAddr("10.111.0.2")
@@ -240,6 +250,9 @@ type bridge struct {
 	ports          map[uint16]bool
 	nextPort       uint16
 	rx, tx         atomic.Int64
+	wait           sync.WaitGroup
+	assess         func(string) bool
+	observe        func(string, int)
 }
 
 func ips(s string) []netip.Addr {
@@ -255,7 +268,7 @@ func ips(s string) []netip.Addr {
 
 //export UBBridgeStart
 func UBBridgeStart(tfd, efd, mtu C.int, addresses, dns *C.char, filter, record, ctx C.uintptr_t) C.longlong {
-	b := &bridge{tun: os.NewFile(uintptr(tfd), "android-tun"), engine: os.NewFile(uintptr(efd), "engine-packets"), servers: ips(C.GoString(dns)), ctx: ctx, filter: filter, record: record, stop: make(chan struct{}), jobs: make(chan struct{}, 32), ports: map[uint16]bool{}, nextPort: 61000}
+	b := &bridge{tun: packetFile(int(tfd), "android-tun"), engine: packetFile(int(efd), "engine-packets"), servers: ips(C.GoString(dns)), ctx: ctx, filter: filter, record: record, stop: make(chan struct{}), jobs: make(chan struct{}, 32), ports: map[uint16]bool{}, nextPort: 61000}
 	var e error
 	b.upstream, e = newStack(ips(C.GoString(addresses)), int(mtu), func(p []byte) { b.engine.Write(p) })
 	if e != nil {
@@ -269,7 +282,8 @@ func UBBridgeStart(tfd, efd, mtu C.int, addresses, dns *C.char, filter, record, 
 	}
 	b.dns.s.SetPromiscuousMode(1, true)
 	b.dns.s.SetSpoofing(1, true)
-	for _, ip := range []netip.Addr{netip.IPv4Unspecified(), netip.IPv6Unspecified()} {
+	b.udpForwarder()
+	for _, ip := range []netip.Addr{netip.IPv6Unspecified()} {
 		if e = b.listen(ip); e != nil {
 			b.close()
 			return -1
@@ -279,10 +293,11 @@ func UBBridgeStart(tfd, efd, mtu C.int, addresses, dns *C.char, filter, record, 
 	mu.Lock()
 	bridges[id] = b
 	mu.Unlock()
-	go b.fromTun()
-	go b.fromEngine()
+	b.launch(b.fromTun)
+	b.launch(b.fromEngine)
 	return C.longlong(id)
 }
+func (b *bridge) launch(fn func()) { b.wait.Add(1); go func() { defer b.wait.Done(); fn() }() }
 func (b *bridge) close() {
 	b.once.Do(func() {
 		close(b.stop)
@@ -309,6 +324,7 @@ func UBBridgeStop(id C.longlong) {
 	mu.Unlock()
 	if b != nil {
 		b.close()
+		b.wait.Wait()
 	}
 }
 
@@ -408,38 +424,46 @@ func (b *bridge) acquire() bool {
 		return false
 	}
 }
+func (b *bridge) udpForwarder() {
+	f := udp.NewForwarder(b.dns.s, func(r *udp.ForwarderRequest) {
+		if r.ID().LocalPort != 53 || !b.acquire() {
+			return
+		}
+		var w waiter.Queue
+		ep, e := r.CreateEndpoint(&w)
+		if e != nil {
+			<-b.jobs
+			return
+		}
+		c := gonet.NewUDPConn(&w, ep)
+		b.launch(func() {
+			defer c.Close()
+			defer func() { <-b.jobs }()
+			data := make([]byte, 65535)
+			for {
+				c.SetDeadline(time.Now().Add(10 * time.Second))
+				n, e := c.Read(data)
+				if e != nil {
+					return
+				}
+				answer := b.answer(data[:n], true)
+				if answer != nil {
+					if _, e = c.Write(answer); e != nil {
+						return
+					}
+				}
+			}
+		})
+	})
+	b.dns.s.SetTransportProtocolHandler(udp.ProtocolNumber, f.HandlePacket)
+}
 func (b *bridge) listen(ip netip.Addr) error {
 	a, p := addr(ip, 53)
-	u, e := gonet.DialUDP(b.dns.s, &a, nil, p)
-	if e != nil {
-		return e
-	}
-	go func() {
-		defer u.Close()
-		data := make([]byte, 65535)
-		for {
-			n, remote, e := u.ReadFrom(data)
-			if e != nil {
-				return
-			}
-			q := append([]byte(nil), data[:n]...)
-			if !b.acquire() {
-				continue
-			}
-			go func() {
-				defer func() { <-b.jobs }()
-				answer := b.answer(q, true)
-				if answer != nil {
-					u.WriteTo(answer, remote)
-				}
-			}()
-		}
-	}()
 	l, e := gonet.ListenTCP(b.dns.s, a, p)
 	if e != nil {
 		return e
 	}
-	go func() {
+	b.launch(func() {
 		defer l.Close()
 		for {
 			c, e := l.Accept()
@@ -450,7 +474,7 @@ func (b *bridge) listen(ip netip.Addr) error {
 				c.Close()
 				continue
 			}
-			go func() {
+			b.launch(func() {
 				defer c.Close()
 				defer func() { <-b.jobs }()
 				for {
@@ -476,9 +500,9 @@ func (b *bridge) listen(ip netip.Addr) error {
 						return
 					}
 				}
-			}()
+			})
 		}
-	}()
+	})
 	return nil
 }
 func question(q []byte) (dnsmessage.Header, dnsmessage.Question, error) {
@@ -512,35 +536,50 @@ func errorAnswer(q []byte, rcode dnsmessage.RCode, truncated bool) []byte {
 	a, _ := b.Finish()
 	return a
 }
+func (b *bridge) blocks(host string) bool {
+	if b.assess != nil {
+		return b.assess(host)
+	}
+	ch := C.CString(host)
+	defer C.free(unsafe.Pointer(ch))
+	return C.call_filter(b.filter, b.ctx, ch) != 0
+}
+func (b *bridge) recordResult(host string, outcome int) {
+	if b.observe != nil {
+		b.observe(host, outcome)
+		return
+	}
+	ch := C.CString(host)
+	defer C.free(unsafe.Pointer(ch))
+	C.call_record(b.record, b.ctx, ch, C.int(outcome))
+}
 func (b *bridge) answer(q []byte, isUDP bool) []byte {
 	h, v, e := question(q)
 	if e != nil {
 		return nil
 	}
 	host := strings.TrimSuffix(strings.ToLower(v.Name.String()), ".")
-	ch := C.CString(host)
-	defer C.free(unsafe.Pointer(ch))
-	if C.call_filter(b.filter, b.ctx, ch) != 0 {
-		C.call_record(b.record, b.ctx, ch, 1)
+	if b.blocks(host) {
+		b.recordResult(host, 1)
 		return errorAnswer(q, dnsmessage.RCodeNameError, false)
 	}
 	answer, e := b.resolve(q)
 	if e != nil {
-		C.call_record(b.record, b.ctx, ch, -1)
+		b.recordResult(host, -1)
 		return errorAnswer(q, dnsmessage.RCodeServerFailure, false)
 	}
 	var parser dnsmessage.Parser
 	ah, e := parser.Start(answer)
 	av, qe := parser.Question()
 	if e != nil || qe != nil || !ah.Response || ah.ID != h.ID || av != v {
-		C.call_record(b.record, b.ctx, ch, -1)
+		b.recordResult(host, -1)
 		return errorAnswer(q, dnsmessage.RCodeServerFailure, false)
 	}
 	outcome := 0
 	if ah.RCode == dnsmessage.RCodeServerFailure {
 		outcome = -1
 	}
-	C.call_record(b.record, b.ctx, ch, C.int(outcome))
+	b.recordResult(host, outcome)
 	if isUDP {
 		limit := 512 // RFC 6891: parse OPT size, capped to avoid IP fragmentation.
 		for {
