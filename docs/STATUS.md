@@ -98,6 +98,13 @@ Product: **AdBlock**. Published **v0.4.0 testing prerelease**.
 - Removed the Gradle asset dependency on the original browser module. Updater records exact feed versions/hashes; CI validates the committed bundle and connectivity/ad sentinels.
 - Offline bundle integrity check passed locally. Android build, lint, unit and API 26/35 integration checks pending for this revision.
 
+## Unified VPN development branch — 2026-11-05
+- Branch: `feature/unified-vpn-protocols`, draft PR #1.
+- Added `docs/UNIFIED_VPN_PLAN.md` specifying one-service WireGuard/OpenVPN integration, profile handling, DNS policies and acceptance tests.
+- Added a hamburger menu to Dashboard with navigation and clearly marked **coming soon** VPN/profile entries. Existing DNS-only VPN behaviour is unchanged.
+- **Not implemented:** WireGuard engine, OpenVPN engine, full traffic tunnel, profile import/storage, DNS integration for tunneled traffic, VPN connection status.
+- **Unverified:** build, tests, emulator, physical devices. Do not publish as functional VPN support until implemented and verified.
+
 ## Next work
 1. Run the remaining physical-device matrix in VERIFICATION; record models, Android versions, APK hash and exact cases.
 2. Implement and test client TCP DNS before broad DNS interoperability claims.
