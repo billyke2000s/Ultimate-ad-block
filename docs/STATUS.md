@@ -171,3 +171,10 @@ ELF inspection found libubvpn.so depended on the build machine's absolute Go
 library path: Go c-shared output had no SONAME. Added the packaged libubgo.so
 SONAME and APK ELF dependency checks. This is a runtime packaging defect; neither
 protocol was marked Android-verified from a successful build alone.
+
+### Additional runtime acceptance assertions
+Added cross-app IPv6 HTTP source-address and IPv6 TCP DNS checks, plus direct
+IPv4/IPv6 TCP attempts that must fail after invalid authentication/certificates
+and deliberate termination of only the protocol engine. These keep the service
+alive to test retained routes. They are acceptance assertions, not claimed passes
+until their exact CI run is inspected. No production behavior changes in this step.

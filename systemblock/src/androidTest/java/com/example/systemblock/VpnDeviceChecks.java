@@ -25,7 +25,7 @@ final class VpnDeviceChecks {
    context.startForegroundService(new Intent(context,BlockVpn.class));
    long until=SystemClock.elapsedRealtime()+90000;boolean connected=false;
    while(SystemClock.elapsedRealtime()<until){NativeSession session=BlockVpn.activeSession;connected=session!=null&&session.connectedSince>0;if(connected)break;if(Boolean.parseBoolean(args.getString("bad_auth","false"))&&BlockVpn.status.contains("AUTH FAILED"))break;if(Boolean.parseBoolean(args.getString("bad_cert","false"))&&BlockVpn.status.contains("CERT"))break;Thread.sleep(250);}
-   if(Boolean.parseBoolean(args.getString("bad_auth","false"))||Boolean.parseBoolean(args.getString("bad_cert","false"))){if(connected)throw new AssertionError("Invalid credentials/certificate connected");if(Boolean.parseBoolean(args.getString("bad_auth","false"))&&!BlockVpn.status.contains("AUTH FAILED"))throw new AssertionError("No authentication rejection: "+BlockVpn.status);if(Boolean.parseBoolean(args.getString("bad_cert","false"))&&!BlockVpn.status.contains("CERT VERIFY FAIL"))throw new AssertionError("No certificate rejection: "+BlockVpn.status);if(!BlockVpn.running)throw new AssertionError("Failure removed fail-closed VPN");return;}
+   if(Boolean.parseBoolean(args.getString("bad_auth","false"))||Boolean.parseBoolean(args.getString("bad_cert","false"))){if(connected)throw new AssertionError("Invalid credentials/certificate connected");if(Boolean.parseBoolean(args.getString("bad_auth","false"))&&!BlockVpn.status.contains("AUTH FAILED"))throw new AssertionError("No authentication rejection: "+BlockVpn.status);if(Boolean.parseBoolean(args.getString("bad_cert","false"))&&!BlockVpn.status.contains("CERT VERIFY FAIL"))throw new AssertionError("No certificate rejection: "+BlockVpn.status);if(!BlockVpn.running)throw new AssertionError("Failure removed fail-closed VPN");verifyClosed();return;}
    if(!connected)throw new AssertionError("No authenticated connection: "+BlockVpn.status);
    runProbe(ip,true);
    NativeSession session=BlockVpn.activeSession;long started=session.connectedSince;settings.edit().putBoolean("block_domains",false).commit();runProbe(ip,false);
@@ -34,11 +34,19 @@ final class VpnDeviceChecks {
    // Real socket reopen on current network. Wi-Fi/mobile handover needs a phone.
    session.networkChanged();until=SystemClock.elapsedRealtime()+45000;while(session.connectedSince==0&&SystemClock.elapsedRealtime()<until)Thread.sleep(250);
    if(session.connectedSince==0)throw new AssertionError("Reconnect did not authenticate");runProbe(ip,false);
+   // Terminate only the in-process engine; the Android service must retain routes.
+   String field=protocol.equals("WireGuard")?"wireguard":"open",method=protocol.equals("WireGuard")?"wgStop":"openStop";
+   java.lang.reflect.Field handle=NativeSession.class.getDeclaredField(field);handle.setAccessible(true);java.lang.reflect.Method stop=NativeSession.class.getDeclaredMethod(method,long.class);stop.setAccessible(true);stop.invoke(session,handle.getLong(session));verifyClosed();
+   if(!BlockVpn.running)throw new AssertionError("Engine failure removed the Android VPN");
   }finally{
    context.startService(new Intent(context,BlockVpn.class).setAction("stop"));long until=SystemClock.elapsedRealtime()+20000;while(!BlockVpn.status.startsWith("Stopped")&&SystemClock.elapsedRealtime()<until)Thread.sleep(100);
    if(!BlockVpn.status.startsWith("Stopped"))throw new AssertionError("VPN stop did not terminate");
    settings.edit().putString("vpn_profile",previous).putBoolean("block_domains",priorBlocking).commit();store.save(original);
   }
+ }
+ private void verifyClosed()throws Exception{
+  shell("rm -f /sdcard/Android/data/com.obskyra.dnsprobe/files/result.txt");shell("am start -W -n com.obskyra.dnsprobe/com.example.dnsprobe.DnsProbe --ez expect_closed true");
+  String report="";long until=SystemClock.elapsedRealtime()+20000;while(SystemClock.elapsedRealtime()<until){report=shell("cat /sdcard/Android/data/com.obskyra.dnsprobe/files/result.txt");if(report.contains("PASS:")||report.contains("FAIL:"))break;Thread.sleep(100);}if(!report.contains("PASS: other-app fail-closed")||report.contains("FAIL:"))throw new AssertionError(report);
  }
  private void runProbe(String server,boolean blocking)throws Exception{
   shell("rm -f /sdcard/Android/data/com.obskyra.dnsprobe/files/result.txt");

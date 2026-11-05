@@ -107,6 +107,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
  def log_message(self,*a): pass
 for ip in ['10.86.0.1','10.87.0.1','10.88.0.1','10.89.0.1']:
  threading.Thread(target=http.server.ThreadingHTTPServer((ip,8080),Handler).serve_forever,daemon=True).start()
+class IPv6Server(http.server.ThreadingHTTPServer):
+ address_family=socket.AF_INET6
+for ip in ['fd86::1','fd87::1','fd88::1','fd89::1']:
+ def serve(ip=ip):
+  import time
+  for attempt in range(50):
+   try: server=IPv6Server((ip,8080),Handler);break
+   except OSError: time.sleep(.1)
+  else: raise RuntimeError('IPv6 fixture did not bind')
+  server.serve_forever()
+ threading.Thread(target=serve,daemon=True).start()
 threading.Event().wait()
 PY
 sudo python3 endpoint.py > endpoint.log 2>&1 &
