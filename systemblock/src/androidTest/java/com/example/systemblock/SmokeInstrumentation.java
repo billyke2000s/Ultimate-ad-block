@@ -8,10 +8,12 @@ import java.net.*;
 
 /** Emulator integration test, run only after the workflow grants VPN consent via appops. */
 public final class SmokeInstrumentation extends Instrumentation {
- @Override public void onCreate(Bundle arguments){super.onCreate(arguments);start();}
+ private Bundle options;
+ @Override public void onCreate(Bundle arguments){super.onCreate(arguments);options=arguments;start();}
  @Override public void onStart(){
   Bundle result=new Bundle();Context context=getTargetContext();
   try{
+   if(options!=null&&options.getString("vpn_profile")!=null){new VpnDeviceChecks(this,options).run();result.putString("stream","PASS: controlled VPN endpoint checks\n");finish(Activity.RESULT_OK,result);return;}
    android.net.ConnectivityManager connectivity=context.getSystemService(android.net.ConnectivityManager.class);
    long networkDeadline=SystemClock.elapsedRealtime()+60000;boolean online=false;
    while(!online && SystemClock.elapsedRealtime()<networkDeadline){

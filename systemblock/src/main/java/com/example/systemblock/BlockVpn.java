@@ -37,11 +37,7 @@ public final class BlockVpn extends VpnService {
   if(reader!=null)return START_NOT_STICKY;
   NotificationManager nm=getSystemService(NotificationManager.class);
   nm.createNotificationChannel(new NotificationChannel("blocking","System-wide blocking",NotificationManager.IMPORTANCE_LOW));
-  PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,Dashboard.class),PendingIntent.FLAG_IMMUTABLE);
-  PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,BlockVpn.class).setAction("stop"),PendingIntent.FLAG_IMMUTABLE);
-  startForeground(1,new Notification.Builder(this,"blocking").setSmallIcon(android.R.drawable.ic_lock_lock)
-    .setContentTitle("AdBlock").setContentText("Local DNS filter — tap for status")
-    .setContentIntent(open).addAction(new Notification.Action.Builder(null,"Stop",stop).build()).setOngoing(true).build());
+  startForeground(1,notification("Starting protection…"));
   status="Loading blocklist…";
   reader=new Thread(this::readTunnel,"dns-reader");reader.start();return START_NOT_STICKY;
  }
@@ -112,7 +108,13 @@ public final class BlockVpn extends VpnService {
   try{VpnProfiles.Profile profile=new VpnProfiles(this).find(selected);synchronized(lifecycle){if(stopping)return;remote=new NativeSession(this,loaded,profile);activeSession=remote;}remote.start();}catch(Exception|LinkageError failure){remoteStatus("VPN setup failed — traffic blocked. Check profile, DNS and network.");}
   while(!stopping){NativeSession session=remote;if(session!=null)session.poll();Thread.sleep(1500);}
  }
- void remoteStatus(String value){synchronized(lifecycle){if(!stopping)status=value;}}
+ private Notification notification(String content){
+  PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,Dashboard.class),PendingIntent.FLAG_IMMUTABLE);
+  PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,BlockVpn.class).setAction("stop"),PendingIntent.FLAG_IMMUTABLE);
+  NativeSession session=activeSession;String name=session==null?"AdBlock":"AdBlock · "+session.protocol();
+  return new Notification.Builder(this,"blocking").setSmallIcon(android.R.drawable.ic_lock_lock).setContentTitle(name).setContentText(content).setContentIntent(open).addAction(new Notification.Action.Builder(null,"Stop",stop).build()).setOngoing(true).build();
+ }
+ void remoteStatus(String value){synchronized(lifecycle){if(!stopping&&!status.equals(value)){status=value;getSystemService(NotificationManager.class).notify(1,notification(value));}}}
  void releaseGuard(){synchronized(lifecycle){if(guard!=null)try{guard.close();}catch(IOException ignored){}guard=null;}}
  private void resolve(byte[] packet,byte[] query){
   if(stopping)return;

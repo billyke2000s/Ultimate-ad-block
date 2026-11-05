@@ -74,6 +74,8 @@ jobs:
         with:
           name: dns-probe-apk
           path: apks
+      - name: Start controlled VPN endpoints
+        run: bash scripts/vpn-test-endpoints.sh
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -85,7 +87,9 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: bash scripts/systemblock-smoke.sh
+          script: |
+            bash scripts/systemblock-smoke.sh
+            bash scripts/vpn-device-checks.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:

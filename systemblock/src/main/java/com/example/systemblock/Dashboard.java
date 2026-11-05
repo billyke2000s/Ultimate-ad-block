@@ -111,7 +111,7 @@ public final class Dashboard extends Activity {
   profileWork.execute(()->{try{
    String name="VPN";try(android.database.Cursor c=getContentResolver().query(uri,new String[]{android.provider.OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())name=c.getString(0);}
    String text;boolean zip=name.toLowerCase(Locale.ROOT).endsWith(".zip");try(java.io.InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new java.io.IOException();text=zip?OpenProfile.fromZip(in):new String(OpenProfile.read(in,OpenProfile.LIMIT),java.nio.charset.StandardCharsets.UTF_8);}
-   boolean wg=!zip&&text.trim().startsWith("[Interface]");if(wg)NativeSession.wireguard(text);else text=OpenProfile.validate(text);
+   boolean wg=!zip&&java.util.regex.Pattern.compile("(?im)^\\s*\\[Interface\\]\\s*$").matcher(text).find();if(wg)NativeSession.wireguard(text);else text=OpenProfile.validate(text);
    VpnProfiles store=new VpnProfiles(this);java.util.List<VpnProfiles.Profile> profiles=store.load();VpnProfiles.Profile p=new VpnProfiles.Profile(wg?"WireGuard":"OpenVPN",text);p.name=name.replaceFirst("(?i)\\.(conf|ovpn|zip)$","");profiles.add(p);store.save(profiles);
    runOnUiThread(()->{showPage(3);Toast.makeText(this,"Profile imported securely",Toast.LENGTH_SHORT).show();});
   }catch(Exception e){runOnUiThread(()->profileFailure(e instanceof java.io.IOException&&e.getMessage()!=null?e.getMessage():"Import failed. Check profile format, certificate bundle and secure storage."));}});
@@ -141,11 +141,12 @@ public final class Dashboard extends Activity {
   EditText name=new EditText(this);name.setSingleLine();name.setHint("Profile name");name.setText(p.name);
   EditText user=new EditText(this);user.setSingleLine();user.setHint("Username");user.setText(p.user);
   EditText password=new EditText(this);password.setSingleLine();password.setInputType(129);password.setHint("Password");password.setText(p.password);
+  EditText keyPassword=new EditText(this);keyPassword.setSingleLine();keyPassword.setInputType(129);keyPassword.setHint("Private-key password (optional)");keyPassword.setText(p.keyPassword);
   EditText content=new EditText(this);content.setTextSize(12);content.setGravity(Gravity.TOP);content.setInputType(0x80001|0x20000);content.setText(p.config);
-  if(config)form.addView(content,new LinearLayout.LayoutParams(-1,dp(260)));else{form.addView(name);if(p.protocol.equals("OpenVPN")){form.addView(user);form.addView(password);}}
+  if(config)form.addView(content,new LinearLayout.LayoutParams(-1,dp(260)));else{form.addView(name);if(p.protocol.equals("OpenVPN")){form.addView(user);form.addView(password);form.addView(keyPassword);}}
   AlertDialog dialog=new AlertDialog.Builder(this).setTitle(config?"Configuration":"Profile settings").setView(form).setPositiveButton("Save",null).setNegativeButton("Cancel",null).create();
   dialog.setOnDismissListener(x->getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE));dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-   String value=content.getText().toString(),profileName=name.getText().toString().trim(),username=user.getText().toString(),pass=password.getText().toString();profileWork.execute(()->{try{if(config){if(p.protocol.equals("WireGuard"))NativeSession.wireguard(value);else valueValidation(value);}if(config)p.config=p.protocol.equals("OpenVPN")?OpenProfile.validate(value):value;else{p.name=profileName;p.user=username;p.password=pass;}runOnUiThread(()->{dialog.dismiss();saveProfile(p,false);});}catch(Exception error){runOnUiThread(()->profileFailure("Configuration rejected. Check keys, addresses, DNS, certificates and supported directives."));}});
+   String value=content.getText().toString(),profileName=name.getText().toString().trim(),username=user.getText().toString(),pass=password.getText().toString(),keyPass=keyPassword.getText().toString();profileWork.execute(()->{try{if(config){if(p.protocol.equals("WireGuard"))NativeSession.wireguard(value);else valueValidation(value);}if(config)p.config=p.protocol.equals("OpenVPN")?OpenProfile.validate(value):value;else{p.name=profileName;p.user=username;p.password=pass;p.keyPassword=keyPass;}runOnUiThread(()->{dialog.dismiss();saveProfile(p,false);});}catch(Exception error){runOnUiThread(()->profileFailure("Configuration rejected. Check keys, addresses, DNS, certificates and supported directives."));}});
   }));dialog.show();
  }
  private void valueValidation(String value)throws java.io.IOException{OpenProfile.validate(value);}

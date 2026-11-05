@@ -380,13 +380,6 @@ func (b *bridge) fromTun() {
 		if ok && (ip == virtual4 || ip == virtual6) {
 			continue
 		}
-		// Internally reserved DNS source ports cannot collide with application flows.
-		if ok && (proto == 6 || proto == 17) && len(v) >= o+4 {
-			port := binary.BigEndian.Uint16(v[o:])
-			if port >= 61000 && port < 62000 {
-				continue
-			}
-		}
 		b.tx.Add(int64(n))
 		if _, e = b.engine.Write(v); e != nil {
 			return
@@ -405,7 +398,7 @@ func (b *bridge) fromEngine() {
 		_, proto, o, ok := packet(v)
 		if ok && (proto == 6 || proto == 17) && len(v) >= o+4 {
 			port := binary.BigEndian.Uint16(v[o+2:])
-			if port >= 61000 && port < 62000 {
+			if port >= 61000 && port < 62000 && binary.BigEndian.Uint16(v[o:]) == 53 {
 				b.upstream.inject(v)
 				continue
 			}
@@ -508,7 +501,7 @@ func (b *bridge) listen(ip netip.Addr) error {
 func question(q []byte) (dnsmessage.Header, dnsmessage.Question, error) {
 	var p dnsmessage.Parser
 	h, e := p.Start(q)
-	if e != nil || h.Response {
+	if e != nil || h.Response || h.OpCode != 0 || h.Truncated || h.RCode != 0 || binary.BigEndian.Uint16(q[6:]) != 0 || binary.BigEndian.Uint16(q[8:]) != 0 {
 		return h, dnsmessage.Question{}, errors.New("query header")
 	}
 	v, e := p.Question()
@@ -571,7 +564,7 @@ func (b *bridge) answer(q []byte, isUDP bool) []byte {
 	var parser dnsmessage.Parser
 	ah, e := parser.Start(answer)
 	av, qe := parser.Question()
-	if e != nil || qe != nil || !ah.Response || ah.ID != h.ID || av != v {
+	if e != nil || qe != nil || !ah.Response || ah.OpCode != h.OpCode || ah.ID != h.ID || av != v {
 		b.recordResult(host, -1)
 		return errorAnswer(q, dnsmessage.RCodeServerFailure, false)
 	}
@@ -664,3 +657,19 @@ func (b *bridge) resolve(q []byte) ([]byte, error) {
 	return nil, errors.New("VPN DNS unavailable")
 }
 func main() {}
+
+//export UBBridgeAlive
+func UBBridgeAlive(id C.longlong) C.int {
+	mu.Lock()
+	b := bridges[int64(id)]
+	mu.Unlock()
+	if b == nil {
+		return 0
+	}
+	select {
+	case <-b.stop:
+		return 0
+	default:
+		return 1
+	}
+}

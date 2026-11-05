@@ -53,8 +53,8 @@ final class NativeSession implements Closeable {
    connectionState="Waiting for WireGuard handshake";service.remoteStatus(connectionState);
   }else{
    String config=resolved(OpenProfile.validate(profile.config),false);
-   synchronized(this){if(closing)return;open=openCreate();}
-   openThread=new Thread(()->{String error=openRun(open,config,profile.user,profile.password);if(!closing){connectionState=error.isEmpty()?"Disconnected — traffic blocked":"OpenVPN: "+error+" — traffic blocked";connectedSince=0;service.remoteStatus(connectionState);}},"openvpn-core");openThread.start();
+   synchronized(this){if(closing)return;open=openCreate();
+   openThread=new Thread(()->{String error=openRun(open,config,profile.user,profile.password,profile.keyPassword);if(!closing){connectionState=error.isEmpty()?"Disconnected — traffic blocked":"OpenVPN: "+error+" — traffic blocked";connectedSince=0;service.remoteStatus(connectionState);}},"openvpn-core");openThread.start();}
   }
  }
  private int establishWireguard(String config)throws Exception{
@@ -65,8 +65,7 @@ final class NativeSession implements Closeable {
   }finally{pair[0].close();pair[1].close();}
  }
  private ParcelFileDescriptor[] pair()throws Exception{
-  FileDescriptor a=new FileDescriptor(),b=new FileDescriptor();Os.socketpair(OsConstants.AF_UNIX,OsConstants.SOCK_DGRAM|OsConstants.SOCK_CLOEXEC,0,a,b);
-  try{return new ParcelFileDescriptor[]{ParcelFileDescriptor.dup(a),ParcelFileDescriptor.dup(b)};}finally{Os.close(a);Os.close(b);}
+  int[] fds=socketPair();if(fds.length!=2)throw new IOException("Socket pair failed");return new ParcelFileDescriptor[]{ParcelFileDescriptor.adoptFd(fds[0]),ParcelFileDescriptor.adoptFd(fds[1])};
  }
  private synchronized void establishBridge(ParcelFileDescriptor engine)throws Exception{
   if(closing)throw new IOException("Session stopped");if(dns.isEmpty()||addresses.isEmpty())throw new IOException("VPN server must provide addresses and DNS");
@@ -99,12 +98,14 @@ final class NativeSession implements Closeable {
  int establish(){try{ParcelFileDescriptor[] pair=pair();try{establishBridge(pair[0]);return pair[1].detachFd();}finally{pair[0].close();pair[1].close();}}catch(Exception e){service.remoteStatus("VPN setup failed — traffic blocked");return -1;}}
  int onEvent(String name){
   if(closing)return 0;
-  if(name.equals("CONNECTED")){connectionState="Connected";connectedSince=android.os.SystemClock.elapsedRealtime();}
+  if(name.startsWith("ERROR:")&&name.substring(6).matches("[A-Z_]{1,64}")){connectionState=name.substring(6).replace('_',' ')+" — traffic blocked";connectedSince=0;}
+  else if(name.equals("CONNECTED")){connectionState="Connected";connectedSince=android.os.SystemClock.elapsedRealtime();}
   else if(Arrays.asList("RECONNECTING","DISCONNECTED","AUTH_FAILED","CERT_VERIFY_FAIL","TLS_ERROR","CONNECTION_TIMEOUT","RESOLVE","CONNECTING","WAIT","TCP_CONNECT").contains(name)){connectionState=name.replace('_',' ');connectedSince=0;}
   service.remoteStatus(connectionState);return 1;
  }
  synchronized void poll(){
   if(closing)return;
+  if(bridge>0&&!bridgeAlive(bridge)){connectedSince=0;connectionState="Packet bridge stopped — traffic blocked";service.remoteStatus(connectionState);return;}
   if(wireguard>0){String config=wgConfig(wireguard);long newest=0;for(String line:config.split("\n"))if(line.startsWith("last_handshake_time_sec="))try{newest=Math.max(newest,Long.parseLong(line.substring(line.indexOf('=')+1)));}catch(NumberFormatException ignored){}
    if(newest>0&&System.currentTimeMillis()/1000-newest<180){if(connectedSince==0)connectedSince=android.os.SystemClock.elapsedRealtime();connectionState="Connected";}
    else{connectedSince=0;connectionState="Waiting for WireGuard handshake — traffic blocked until peer responds";}service.remoteStatus(connectionState);
@@ -119,8 +120,9 @@ final class NativeSession implements Closeable {
   if(thread!=null)try{thread.join();}catch(InterruptedException e){Thread.currentThread().interrupt();return;}
   synchronized(this){if(client>0){openDestroy(client);open=0;}if(wireguard>0){wgStop(wireguard);wireguard=0;}if(bridge>0){bridgeStop(bridge);bridge=0;}if(tun!=null)try{tun.close();}catch(IOException ignored){}tun=null;if(context>0){destroy(context);context=0;}}
  }
+ private native int[] socketPair();
  private native long create();private native void destroy(long ptr);
  private native long wgStart(long ptr,int fd,int mtu,String config);private native void wgStop(long handle);private native boolean wgRebind(long handle);private native String wgConfig(long handle);
- private native long bridgeStart(long ptr,int tun,int engine,int mtu,String addresses,String dns);private native void bridgeStop(long handle);private native long bridgeBytes(long handle,boolean receive);
- private native long openCreate();private native String openRun(long ptr,String config,String user,String password);private native void openStop(long ptr);private native void openReconnect(long ptr);private native void openDestroy(long ptr);
+ private native long bridgeStart(long ptr,int tun,int engine,int mtu,String addresses,String dns);private native void bridgeStop(long handle);private native boolean bridgeAlive(long handle);private native long bridgeBytes(long handle,boolean receive);
+ private native long openCreate();private native String openRun(long ptr,String config,String user,String password,String keyPassword);private native void openStop(long ptr);private native void openReconnect(long ptr);private native void openDestroy(long ptr);
 }

@@ -113,3 +113,32 @@ Product: **AdBlock**. Published **v0.4.0 testing prerelease**.
 
 ## Handoff discipline
 Read root AGENTS, this file and scoped instructions. Preserve the original browser module. Keep exact source SHA/run/device evidence; implemented, emulator-verified and physical-device-verified are different statuses. Do not replace these limits with “all apps”, “no ads”, “fully working” or invented device results.
+
+## Unified VPN implementation checkpoint — 2026-11-05
+
+Experimental source, **not production verified**. PR #1 remains draft.
+
+- Both engines are now integrated in-process behind the existing `BlockVpn`.
+  The WireGuard AAR's service and unused native libraries are explicitly excluded.
+- Added the shared Go/gVisor packet bridge, IPv4/IPv6 UDP/TCP DNS filtering,
+  authenticated protocol status, protected/network-bound transport sockets,
+  profile/server DNS through the tunnel and independent blocking toggle.
+- Added bounded .conf/.ovpn/relative-certificate ZIP import, encrypted multi-profile
+  persistence, name/config/authentication editing and compact hamburger navigation.
+- Remote routes remain installed on engine/setup failure while the service lives.
+  Android process death is a separate unresolved lockdown/always-on matrix; do not
+  claim crash-proof leak protection or enable lockdown for DNS-only mode.
+- Local controlled real UDP WireGuard peers passed handshake, IPv4/IPv6 ordinary
+  TCP, virtual and hard-coded UDP/TCP DNS filtering, disabled blocking, measured
+  traffic counters and shutdown under `go test -race` (12 DNS subcases).
+- Local Android build/assembly for arm64-v8a, armeabi-v7a, x86_64, 35 JUnit tests,
+  lint (0 errors, 8 warnings), test APK and dnsprobe assembly passed at the current
+  working checkpoint. Later revisions require a fresh result.
+- CI at f64265b passed native tests and failed Android lint on SOCK_CLOEXEC's API
+  level; replaced the unavailable Java API with a native socketpair. Checks were
+  not suppressed. New CI/runtime endpoint checks are pending.
+- Added CI-only generated WireGuard and OpenVPN UDP/TCP servers and cross-app
+  instrumentation. No server/provider keys are committed or bundled in the APK.
+- Not yet verified: Android protocol connectivity, OpenVPN endpoint authentication,
+  device VPN DNS/traffic leaks, real public-IP changes, mobile handover, process
+  death/revocation, physical devices and update-signature compatibility.
