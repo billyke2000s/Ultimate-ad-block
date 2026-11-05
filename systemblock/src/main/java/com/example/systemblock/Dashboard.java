@@ -42,7 +42,7 @@ public final class Dashboard extends Activity {
  private Button action(String text,boolean primary,Runnable run){Button b=new Button(this);b.setText(text);b.setTextSize(13);b.setAllCaps(false);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(44));b.setMinimumHeight(dp(44));b.setPadding(dp(10),dp(8),dp(10),dp(8));b.setTextColor(primary?BG:INK);b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));b.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(0x228ba7ff),surface(primary?BLUE:CARD,10),null));b.setOnClickListener(v->run.run());return b;}
  private void shell(){
   LinearLayout frame=column();frame.setBackgroundColor(BG);frame.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i.consumeSystemWindowInsets();});
-  LinearLayout toolbar=row();toolbar.setPadding(dp(18),dp(9),dp(18),dp(9));heading=label("AdBlock",22,INK,true);toolbar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));toolbar.addView(label("● LOCAL DNS",10,MUTED,true));frame.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(52)));
+  LinearLayout toolbar=row();toolbar.setPadding(dp(12),dp(9),dp(18),dp(9));Button menu=action("☰",false,this::openVpnMenu);menu.setTag("hamburger-menu");menu.setContentDescription("Open navigation and VPN options");toolbar.addView(menu,new LinearLayout.LayoutParams(dp(48),dp(44)));heading=label("AdBlock",22,INK,true);toolbar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));toolbar.addView(label("● LOCAL DNS",10,MUTED,true));frame.addView(toolbar,new LinearLayout.LayoutParams(-1,dp(52)));
   body=column();frame.addView(body,new LinearLayout.LayoutParams(-1,0,1));nav=row();nav.setPadding(dp(12),dp(6),dp(12),dp(6));nav.setBackgroundColor(CARD);
   String[] names={"Overview","Activity","Settings"};for(int i=0;i<3;i++){final int destination=i;navigation[i]=action(names[i],false,()->showPage(destination));navigation[i].setTag("nav-"+i);nav.addView(navigation[i],new LinearLayout.LayoutParams(0,dp(48),1));}frame.addView(nav);setContentView(frame);
  }
@@ -94,6 +94,15 @@ public final class Dashboard extends Activity {
  }
  private void section(String text){TextView t=label(text.toUpperCase(Locale.UK),11,BLUE,true);t.setLetterSpacing(.08f);root.addView(t);gap(root,4);}
  private void setting(String name,String description,Runnable run,String tag){LinearLayout item=row();item.setPadding(dp(4),dp(13),dp(4),dp(13));LinearLayout copy=column();copy.addView(label(name,14,INK,true));gap(copy,4);copy.addView(label(description,11,MUTED,false));item.addView(copy,new LinearLayout.LayoutParams(0,-2,1));item.addView(label("›",22,MUTED,false));item.setBackground(new RippleDrawable(android.content.res.ColorStateList.valueOf(0x228ba7ff),null,null));item.setOnClickListener(v->run.run());item.setFocusable(true);item.setTag(tag);root.addView(item);View divider=new View(this);divider.setBackgroundColor(BORDER);root.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));}
+ private void openVpnMenu(){
+  final String[] options={"Overview","Activity","Settings","VPN connections (coming soon)","Import VPN profile (coming soon)"};
+  new AlertDialog.Builder(this).setTitle("AdBlock · Menu").setItems(options,(dialog,which)->{
+   if(which<3){showPage(which);return;}
+   new AlertDialog.Builder(this).setTitle(which==3?"VPN connections":"Import VPN profile")
+    .setMessage("WireGuard and OpenVPN are not available in this build. The current service only filters DNS and does not tunnel internet traffic. VPN profiles cannot be imported until the protocol engines and secure storage are implemented and tested.")
+    .setPositiveButton("OK",null).show();
+  }).setNegativeButton("Close",null).show();
+ }
  private void toggleProtection(){
   if(BlockVpn.running){startService(new Intent(this,BlockVpn.class).setAction("stop"));update();return;}
   String status=BlockVpn.status;
