@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include <jni.h>
 #include <string>
+#include <sstream>
 #include <memory>
 #include <mutex>
 #include <sys/socket.h>
@@ -34,6 +35,14 @@ public:
  openvpn::Stop* get_async_stop()override{return &token;}
  bool socket_protect(openvpn_io::detail::socket_type s,std::string,bool)override{return protect(reinterpret_cast<uintptr_t>(thisCallbacks()),s);}
  Callbacks* thisCallbacks(){return static_cast<Callbacks*>(this);}
+ bool remote_override_enabled()override{return true;}
+ void remote_override(openvpn::ClientAPI::RemoteOverride&r)override{
+  Env v;auto cls=v.e->GetObjectClass(obj);auto method=v.e->GetMethodID(cls,"nextRemote","()Ljava/lang/String;");auto value=static_cast<jstring>(v.e->CallObjectMethod(obj,method));v.e->DeleteLocalRef(cls);
+  if(v.e->ExceptionCheck()){v.e->ExceptionClear();r.error="Endpoint bootstrap failed";return;}
+  if(!value){r.error="Endpoint bootstrap failed";return;}
+  std::istringstream in(str(v.e,value));v.e->DeleteLocalRef(value);std::getline(in,r.ip);std::getline(in,r.host);std::getline(in,r.port);std::getline(in,r.proto);
+  if(r.ip.empty()||r.host.empty()||r.port.empty()||r.proto.empty())r.error="Invalid endpoint override";
+ }
  bool pause_on_connection_timeout()override{return false;}
  void event(const openvpn::ClientAPI::Event&e)override{if(e.name=="CONNECTED"){auto info=connection_info();text("setServer",info.serverIp+":"+info.serverPort);}Callbacks::event(e.error?"ERROR:"+e.name:e.name);}
  void log(const openvpn::ClientAPI::LogInfo&)override{} // Never log profiles, credentials or server messages.
@@ -92,3 +101,5 @@ JNI(openDestroy) void JNICALL Java_com_example_systemblock_NativeSession_openDes
 JNI(bridgeAlive) jboolean JNICALL Java_com_example_systemblock_NativeSession_bridgeAlive(JNIEnv*,jobject,jlong id){return UBBridgeAlive(id)!=0;}
 
 JNI(socketPair) jintArray JNICALL Java_com_example_systemblock_NativeSession_socketPair(JNIEnv*e,jobject){int fds[2];if(socketpair(AF_UNIX,SOCK_DGRAM|SOCK_CLOEXEC,0,fds)!=0)return e->NewIntArray(0);jintArray out=e->NewIntArray(2);e->SetIntArrayRegion(out,0,2,fds);return out;}
+
+JNI(wgUpdate) jboolean JNICALL Java_com_example_systemblock_NativeSession_wgUpdate(JNIEnv*e,jobject,jlong id,jstring config){auto s=str(e,config);return UBWgUpdate(id,const_cast<char*>(s.c_str()))!=0;}

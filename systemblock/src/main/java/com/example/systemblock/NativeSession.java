@@ -18,7 +18,7 @@ final class NativeSession implements Closeable {
  private long context,wireguard,bridge,open;
  private Thread openThread;
  private final List<String> addresses=new ArrayList<>(),routes=new ArrayList<>(),dns=new ArrayList<>(),search=new ArrayList<>();
- private int mtu=1280;
+ private int mtu=1280,remoteCursor;
  private ParcelFileDescriptor tun;
  volatile long connectedSince;
  volatile String connectionState="Connecting",server="";
@@ -41,6 +41,14 @@ final class NativeSession implements Closeable {
    out.append(line).append('\n');
   }return out.toString();
  }
+ String nextRemote(){
+  try{
+   String defaultPort="1194",defaultProtocol="udp";List<String[]> remotes=new ArrayList<>();boolean inline=false;
+   for(String line:profile.config.split("\\r?\\n")){String t=line.trim();if(t.startsWith("<")){inline=!t.startsWith("</");continue;}if(inline)continue;String[] w=OpenProfile.tokens(t);if(w.length>0&&w[0].startsWith("--"))w[0]=w[0].substring(2);if(w.length==2&&w[0].equals("port"))defaultPort=w[1];if(w.length==2&&w[0].equals("proto"))defaultProtocol=w[1];if(w.length>=2&&w[0].equals("remote"))remotes.add(w);}
+   if(remotes.isEmpty())return null;int choice=remoteCursor++&0x7fffffff;String[] remote=remotes.get(choice%remotes.size());Network n=service.underlying();if(n==null||closing)return null;
+   String host=remote[1];InetAddress[] candidates=n.getAllByName(host);String ip=candidates[(choice/remotes.size())%candidates.length].getHostAddress();return ip+"\n"+host+"\n"+(remote.length>=3?remote[2]:defaultPort)+"\n"+(remote.length>=4?remote[3]:defaultProtocol);
+  }catch(Exception failure){return null;}
+ }
  void start()throws Exception{
   if(profile.protocol.equals("WireGuard")){
    Config c=wireguard(resolved(profile.config,true));
@@ -52,7 +60,7 @@ final class NativeSession implements Closeable {
    if(establishWireguard(config)<0)throw new IOException("WireGuard engine or tunnel initialization failed");
    connectionState="Waiting for WireGuard handshake";service.remoteStatus(connectionState);
   }else{
-   String config=resolved(OpenProfile.validate(profile.config),false);
+   String config=OpenProfile.validate(profile.config);
    synchronized(this){if(closing)return;open=openCreate();
    openThread=new Thread(()->{String error=openRun(open,config,profile.user,profile.password,profile.keyPassword);if(!closing){connectionState=error.isEmpty()?"Disconnected — traffic blocked":"OpenVPN: "+error+" — traffic blocked";connectedSince=0;service.remoteStatus(connectionState);}},"openvpn-core");openThread.start();}
   }
@@ -72,6 +80,7 @@ final class NativeSession implements Closeable {
   BlockVpn.Builder builder=service.new Builder().setSession("AdBlock · "+profile.protocol).setMtu(mtu).setBlocking(true);
   boolean v4=false,v6=false;
   for(String address:addresses){String[] parts=address.split("/");builder.addAddress(parts[0],Integer.parseInt(parts[1]));if(parts[0].contains(":"))v6=true;else v4=true;}
+  final boolean has4=v4,has6=v6;dns.removeIf(address->address.contains(":")?!has6:!has4);if(dns.isEmpty())throw new IOException("VPN DNS has no usable address family");
   for(String route:routes){String[] parts=route.split("/");builder.addRoute(parts[0],Integer.parseInt(parts[1]));}
   // Capture virtual resolvers. Never call allowBypass in remote mode.
   if(v4)builder.addDnsServer("10.111.0.2").addRoute("10.111.0.2",32);
@@ -115,7 +124,7 @@ final class NativeSession implements Closeable {
  }
  String protocol(){return profile.protocol;}
  synchronized long bytes(boolean rx){return bridge>0?bridgeBytes(bridge,rx):0;}
- synchronized void networkChanged(){if(closing||initializationFailed)return;connectedSince=0;connectionState="Reconnecting — traffic blocked";if(wireguard>0)wgRebind(wireguard);if(open>0&&openThread!=null&&openThread.isAlive())openReconnect(open);service.remoteStatus(connectionState);}
+ synchronized void networkChanged(){if(closing||initializationFailed)return;connectedSince=0;connectionState="Reconnecting — traffic blocked";if(wireguard>0){try{Config c=wireguard(resolved(profile.config,true));if(!wgUpdate(wireguard,c.toWgUserspaceString()))throw new IOException();wgRebind(wireguard);}catch(Exception failure){connectionState="Endpoint lookup failed; encrypted tunnel retained";}}if(open>0&&openThread!=null&&openThread.isAlive())openReconnect(open);service.remoteStatus(connectionState);}
  @Override public void close(){
   closing=true;
   long client;Thread thread;synchronized(this){client=open;thread=openThread;if(client>0)openStop(client);}
@@ -124,7 +133,7 @@ final class NativeSession implements Closeable {
  }
  private native int[] socketPair();
  private native long create();private native void destroy(long ptr);
- private native long wgStart(long ptr,int fd,int mtu,String config);private native void wgStop(long handle);private native boolean wgRebind(long handle);private native String wgConfig(long handle);
+ private native long wgStart(long ptr,int fd,int mtu,String config);private native void wgStop(long handle);private native boolean wgRebind(long handle);private native boolean wgUpdate(long handle,String config);private native String wgConfig(long handle);
  private native long bridgeStart(long ptr,int tun,int engine,int mtu,String addresses,String dns);private native void bridgeStop(long handle);private native boolean bridgeAlive(long handle);private native long bridgeBytes(long handle,boolean receive);
  private native long openCreate();private native String openRun(long ptr,String config,String user,String password,String keyPassword);private native void openStop(long ptr);private native void openReconnect(long ptr);private native void openDestroy(long ptr);
 }

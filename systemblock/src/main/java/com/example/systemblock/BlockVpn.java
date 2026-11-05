@@ -19,7 +19,8 @@ public final class BlockVpn extends VpnService {
  private volatile NativeSession remote;
  private ParcelFileDescriptor guard;
  private ConnectivityManager.NetworkCallback networks;
- private volatile Network network;
+ private volatile Network network,lastNetwork;
+ private final ThreadPoolExecutor networkChanges=new ThreadPoolExecutor(1,1,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(1),new ThreadPoolExecutor.DiscardOldestPolicy());
  private final Object lifecycle=new Object();
  private volatile boolean stopping;
  private boolean restartRequested;
@@ -87,9 +88,14 @@ public final class BlockVpn extends VpnService {
   ConnectivityManager cm=getSystemService(ConnectivityManager.class);
   Network active=cm.getActiveNetwork();NetworkCapabilities cap=cm.getNetworkCapabilities(active);
   if(cap!=null&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN))return active;
+  for(Network n:cm.getAllNetworks()){cap=cm.getNetworkCapabilities(n);if(cap!=null&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)&&cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))return n;}
   if(network!=null)return network;
   for(Network n:cm.getAllNetworks()){cap=cm.getNetworkCapabilities(n);if(cap!=null&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)&&cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN))return n;}
   return null;
+ }
+ private void networkChanged(){
+  Network selected=underlying();if(Objects.equals(selected,lastNetwork))return;lastNetwork=selected;setUnderlyingNetworks(selected==null?new Network[0]:new Network[]{selected});NativeSession session=remote;
+  if(session!=null&&!stopping)try{networkChanges.execute(session::networkChanged);}catch(RejectedExecutionException ignored){}
  }
  boolean protectRemote(int fd){
   try{if(!protect(fd))return false;Network n=underlying();if(n==null)return false;try(ParcelFileDescriptor owned=ParcelFileDescriptor.fromFd(fd)){n.bindSocket(owned.getFileDescriptor());}return true;}catch(IOException e){return false;}
@@ -105,11 +111,12 @@ public final class BlockVpn extends VpnService {
   }
   ConnectivityManager cm=getSystemService(ConnectivityManager.class);
   networks=new ConnectivityManager.NetworkCallback(){
-   @Override public void onAvailable(Network n){network=n;setUnderlyingNetworks(new Network[]{n});NativeSession session=remote;if(session!=null)new Thread(session::networkChanged,"vpn-network").start();}
-   @Override public void onLost(Network n){if(n.equals(network)){network=null;NativeSession session=remote;if(session!=null)new Thread(session::networkChanged,"vpn-network").start();}}
+   @Override public void onAvailable(Network n){network=n;networkChanged();}
+   @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities caps){if(caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))networkChanged();}
+   @Override public void onLost(Network n){if(n.equals(network))network=null;networkChanged();}
   };
   cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN).build(),networks);
-  try{VpnProfiles.Profile profile=new VpnProfiles(this).find(selected);synchronized(lifecycle){if(stopping)return;remote=new NativeSession(this,loaded,profile);activeSession=remote;}remote.start();}catch(Exception|LinkageError failure){String message="VPN setup failed — traffic blocked. Check profile, DNS and network.";NativeSession session=remote;if(session!=null)session.fail(message);else remoteStatus(message);}
+  try{VpnProfiles.Profile profile=new VpnProfiles(this).find(selected);synchronized(lifecycle){if(stopping)return;remote=new NativeSession(this,loaded,profile);activeSession=remote;}remote.start();}catch(Exception|LinkageError failure){String message="VPN setup failed ("+failure.getClass().getSimpleName()+") — traffic blocked. Check profile, DNS and network.";NativeSession session=remote;if(session!=null)session.fail(message);else remoteStatus(message);}
   while(!stopping){NativeSession session=remote;if(session!=null)session.poll();Thread.sleep(1500);}
  }
  private Notification notification(String content){
@@ -156,6 +163,7 @@ public final class BlockVpn extends VpnService {
    // TLS close_notify may write to the network on Android 8. Never close TLS on main.
    new Thread(()->{
     try{
+     networkChanges.shutdownNow();
      if(session!=null)session.close();
      releaseGuard();
      if(executor!=null)executor.shutdownNow();

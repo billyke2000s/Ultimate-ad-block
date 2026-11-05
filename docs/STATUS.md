@@ -152,3 +152,22 @@ The loader now opens the packaged asset, with a gzip fallback for other packager
 Added check-apk.py to compare packaged rules byte-for-byte with the committed gzip
 and verify native ABI contents. This fixes an unverified 0.5.0 baseline startup
 fault; it does not replace missing VPN runtime evidence. Next CI run is required.
+
+### Endpoint/lifecycle refinements
+Remote endpoint hostnames are now re-resolved through the non-VPN network on
+reconnect: OpenVPN uses its remote override callback, WireGuard refreshes peer
+configuration before rebinding protected sockets. Network changes are serialized
+with a bounded queue and prefer validated Wi-Fi when the VPN hides Android's
+default underlying network. Native startup failures cannot later appear connected
+merely because a WireGuard handshake exists without a working packet bridge.
+Added certificate-only and password-only controlled OpenVPN cases, explicit wrong
+password/certificate rejection assertions, and source-address validation at the
+controlled HTTP endpoint. These additions remain pending Android runtime results.
+
+### Second emulator finding
+At e058e2d, both API 26/35 original DNS-only, charts, activity and persistence
+suites passed. Both remote tests then stopped safely during native setup.
+ELF inspection found libubvpn.so depended on the build machine's absolute Go
+library path: Go c-shared output had no SONAME. Added the packaged libubgo.so
+SONAME and APK ELF dependency checks. This is a runtime packaging defect; neither
+protocol was marked Android-verified from a successful build alone.

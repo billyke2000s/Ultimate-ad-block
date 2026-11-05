@@ -678,3 +678,17 @@ func UBBridgeAlive(id C.longlong) C.int {
 		return 1
 	}
 }
+
+//export UBWgUpdate
+func UBWgUpdate(id C.longlong, config *C.char) C.int {
+	mu.Lock()
+	d := wgs[int64(id)]
+	mu.Unlock()
+	if d == nil {
+		return 0
+	}
+	if d.IpcSet(C.GoString(config)) != nil {
+		return 0
+	}
+	return 1
+}

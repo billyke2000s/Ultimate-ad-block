@@ -9,5 +9,5 @@ for entry in 'arm64-v8a arm64 aarch64-linux-android26' 'armeabi-v7a arm armv7a-l
  if [ "$arch" = arm ]; then export GOARM=7; else unset GOARM; fi
  out="../../systemblock/build/go/$abi"
  mkdir -p "$out"
- go build -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384' -o "$out/libubgo.so" .
+ go build -trimpath -buildmode=c-shared -ldflags='-s -w -extldflags=-Wl,-z,max-page-size=16384,-soname,libubgo.so' -o "$out/libubgo.so" .
 done

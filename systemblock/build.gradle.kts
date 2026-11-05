@@ -28,6 +28,7 @@ val buildGo by tasks.registering(Exec::class) {
  environment("ANDROID_NDK_HOME", android.sdkDirectory.resolve("ndk/${android.ndkVersion}").absolutePath)
  commandLine("bash", rootProject.file("scripts/build-go.sh").absolutePath)
  inputs.dir(rootProject.file("native/go"))
+ inputs.file(rootProject.file("scripts/build-go.sh"))
  outputs.dir(layout.buildDirectory.dir("go"))
 }
 tasks.configureEach {

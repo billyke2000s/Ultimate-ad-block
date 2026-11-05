@@ -50,6 +50,7 @@ auth-user-pass-verify $out/auth.sh via-file
 verb 3
 log $out/server-$subnet.log
 EOF_CONF
+ if [ "$subnet" = 88 ]; then printf 'verify-client-cert none\n' >> "server-$subnet.conf"; fi
  sudo openvpn --config "$out/server-$subnet.conf" --daemon
  {
   printf 'client\ndev tun\nproto %s\nremote 10.0.2.2 %s\nnobind\nauth-user-pass\nremote-cert-tls server\nverify-x509-name adblock-ci-server name\n' "${proto/server/client}" "$port"
@@ -60,6 +61,18 @@ EOF_CONF
  } > "openvpn-$subnet.ovpn"
  sudo iptables -t nat -A POSTROUTING -s "10.$subnet.0.0/24" ! -d "10.$subnet.0.0/24" -j MASQUERADE
 done
+# A separate endpoint exercises certificate-only authentication.
+sed -e 's/1194/1196/g' -e 's/88/86/g' -e '/auth-user-pass-verify/d' -e '/script-security/d' -e '/verify-client-cert/d' server-88.conf > server-86.conf
+sudo openvpn --config "$out/server-86.conf" --daemon
+sed -e 's/1194/1196/g' -e '/^auth-user-pass$/d' openvpn-88.ovpn > openvpn-86.ovpn
+sudo iptables -t nat -A POSTROUTING -s 10.86.0.0/24 ! -d 10.86.0.0/24 -j MASQUERADE
+python3 - <<'PY_CONFIG'
+from pathlib import Path
+import re
+p=Path('openvpn-88.ovpn')
+p.write_text(re.sub(r'<(cert|key)>.*?</\1>\s*','',p.read_text(),flags=re.S))
+Path('openvpn-bad-cert.ovpn').write_text(p.read_text().replace('verify-x509-name adblock-ci-server name','verify-x509-name deliberately-wrong-ci-name name'))
+PY_CONFIG
 wg genkey > wg-server.key
 wg genkey > wg-client.key
 wg pubkey < wg-server.key > wg-server.pub
@@ -83,8 +96,8 @@ AllowedIPs = 0.0.0.0/0, ::/0
 PersistentKeepalive = 2
 EOF_WG
 # Restrict the DNS fixture to VPN interfaces. Real Internet lookups still forward normally.
-for i in $(seq 1 50); do if ip link show ovpn87 >/dev/null 2>&1 && ip link show ovpn88 >/dev/null 2>&1; then break; fi;sleep .1;done
-sudo dnsmasq --no-daemon --bind-dynamic --interface=ubwg --interface=ovpn87 --interface=ovpn88 --except-interface=lo --no-resolv --server=1.1.1.1 --address=/doubleclick.net/10.89.0.1 --log-facility="$out/dnsmasq.log" &
+for i in $(seq 1 50); do if ip link show ovpn87 >/dev/null 2>&1 && ip link show ovpn88 >/dev/null 2>&1 && ip link show ovpn86 >/dev/null 2>&1; then break; fi;sleep .1;done
+sudo dnsmasq --no-daemon --bind-dynamic --interface=ubwg --interface=ovpn87 --interface=ovpn88 --interface=ovpn86 --except-interface=lo --no-resolv --server=1.1.1.1 --address=/doubleclick.net/10.89.0.1 --log-facility="$out/dnsmasq.log" &
 printf '%s\n' "$!" > dnsmasq.pid
 cat > endpoint.py <<'PY'
 import http.server,socketserver,threading,socket
@@ -92,7 +105,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
  def do_GET(self):
   body=b'VPN-ENDPOINT '+self.client_address[0].encode();self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
  def log_message(self,*a): pass
-for ip in ['10.87.0.1','10.88.0.1','10.89.0.1']:
+for ip in ['10.86.0.1','10.87.0.1','10.88.0.1','10.89.0.1']:
  threading.Thread(target=http.server.ThreadingHTTPServer((ip,8080),Handler).serve_forever,daemon=True).start()
 threading.Event().wait()
 PY
