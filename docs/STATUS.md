@@ -202,3 +202,7 @@ own condition, and prevented later network callbacks overwriting terminal errors
 For API 35, retained former TUN descriptors until Android publishes the replacement
 interface in LinkProperties, rather than closing them during asynchronous route /
 resolver replacement. Next CI must verify that correction; no API 35 VPN pass yet.
+The workflow now checks out the exact PR head for reproducible source attribution.
+After all build and API 26/35 endpoint cases pass, it prepares (does not publish)
+an experimental draft release with APK, checksum and source SHA. An existing
+release is never overwritten. No draft is prepared while critical tests fail.
