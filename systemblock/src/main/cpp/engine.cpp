@@ -6,6 +6,9 @@
 #include <mutex>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <linux/if_tun.h>
 #include <openvpn/common/stop.hpp>
 #include <client/ovpncli.hpp>
 #include "libubgo.h"
@@ -89,7 +92,7 @@ JNI(openRun) jstring JNICALL Java_com_example_systemblock_NativeSession_openRun(
  auto*c=reinterpret_cast<Client*>(ptr);try{
   openvpn::ClientAPI::Config config;config.content=str(e,profile);config.disableClientCert=config.content.find("<cert>")==std::string::npos;config.privateKeyPassword=str(e,keyPassword);config.guiVersion="AdBlock 0.6 experimental";config.connTimeout=60;config.tunPersist=false;config.googleDnsFallback=false;config.allowUnusedAddrFamilies="no";config.compressionMode="no";config.tlsVersionMinOverride="tls_1_2";config.tlsCertProfileOverride="preferred";config.enableRouteEmulation=true;
   auto eval=c->eval_config(config);if(eval.error)return e->NewStringUTF("Profile rejected by OpenVPN core");
-  if(eval.externalPki)return e->NewStringUTF("External PKI profiles are unsupported");
+  if(eval.externalPki&&!config.disableClientCert)return e->NewStringUTF("External PKI profiles are unsupported");
   openvpn::ClientAPI::ProvideCreds creds;creds.username=str(e,user);creds.password=str(e,password);auto auth=c->provide_creds(creds);if(auth.error)return e->NewStringUTF("Credentials rejected by OpenVPN core");
   auto result=c->connect();return e->NewStringUTF(result.error?result.status.c_str():"");
  }catch(const std::exception&){return e->NewStringUTF("OpenVPN engine error");}
@@ -103,3 +106,5 @@ JNI(bridgeAlive) jboolean JNICALL Java_com_example_systemblock_NativeSession_bri
 JNI(socketPair) jintArray JNICALL Java_com_example_systemblock_NativeSession_socketPair(JNIEnv*e,jobject){int fds[2];if(socketpair(AF_UNIX,SOCK_DGRAM|SOCK_CLOEXEC,0,fds)!=0)return e->NewIntArray(0);jintArray out=e->NewIntArray(2);e->SetIntArrayRegion(out,0,2,fds);return out;}
 
 JNI(wgUpdate) jboolean JNICALL Java_com_example_systemblock_NativeSession_wgUpdate(JNIEnv*e,jobject,jlong id,jstring config){auto s=str(e,config);return UBWgUpdate(id,const_cast<char*>(s.c_str()))!=0;}
+
+JNI(tunInterface) jstring JNICALL Java_com_example_systemblock_NativeSession_tunInterface(JNIEnv*e,jobject,jint fd){ifreq request{};if(ioctl(fd,TUNGETIFF,&request)!=0)return e->NewStringUTF("");return e->NewStringUTF(request.ifr_name);}

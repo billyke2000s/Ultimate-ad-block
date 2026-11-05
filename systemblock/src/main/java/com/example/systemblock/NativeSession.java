@@ -62,7 +62,7 @@ final class NativeSession implements Closeable {
   }else{
    String config=OpenProfile.validate(profile.config);
    synchronized(this){if(closing)return;open=openCreate();
-   openThread=new Thread(()->{String error=openRun(open,config,profile.user,profile.password,profile.keyPassword);if(!closing){connectionState=error.isEmpty()?"Disconnected — traffic blocked":"OpenVPN: "+error+" — traffic blocked";connectedSince=0;service.remoteStatus(connectionState);}},"openvpn-core");openThread.start();}
+   openThread=new Thread(()->{String error=openRun(open,config,profile.user,profile.password,profile.keyPassword);if(!closing){initializationFailed=true;connectionState=error.isEmpty()?"Disconnected — traffic blocked":"OpenVPN: "+error+" — traffic blocked";connectedSince=0;service.remoteStatus(connectionState);}},"openvpn-core");openThread.start();}
   }
  }
  private int establishWireguard(String config)throws Exception{
@@ -91,8 +91,8 @@ final class NativeSession implements Closeable {
   ParcelFileDescriptor replacement=builder.establish();if(replacement==null)throw new IOException("VPN permission revoked");
   long old=bridge;ParcelFileDescriptor previous=tun;tun=replacement;
   long next=bridgeStart(context,ParcelFileDescriptor.dup(tun.getFileDescriptor()).detachFd(),ParcelFileDescriptor.dup(engine.getFileDescriptor()).detachFd(),mtu,String.join(",",addresses),String.join(",",dns));
-  if(old>0)bridgeStop(old);if(previous!=null)previous.close();bridge=next;
-  service.releaseGuard();if(next<0)throw new IOException("DNS bridge initialization failed");
+  if(old>0)bridgeStop(old);bridge=next;
+  service.finishHandover(previous,tunInterface(tun.getFd()));if(next<0)throw new IOException("DNS bridge initialization failed");
  }
  // Native callbacks. Return failure to the engine on every exception.
  int protectSocket(int fd){return !closing&&service.protectRemote(fd)?1:0;}
@@ -131,6 +131,7 @@ final class NativeSession implements Closeable {
   if(thread!=null)try{thread.join();}catch(InterruptedException e){Thread.currentThread().interrupt();return;}
   synchronized(this){if(client>0){openDestroy(client);open=0;}if(wireguard>0){wgStop(wireguard);wireguard=0;}if(bridge>0){bridgeStop(bridge);bridge=0;}if(tun!=null)try{tun.close();}catch(IOException ignored){}tun=null;if(context>0){destroy(context);context=0;}}
  }
+ private native String tunInterface(int fd);
  private native int[] socketPair();
  private native long create();private native void destroy(long ptr);
  private native long wgStart(long ptr,int fd,int mtu,String config);private native void wgStop(long handle);private native boolean wgRebind(long handle);private native boolean wgUpdate(long handle,String config);private native String wgConfig(long handle);

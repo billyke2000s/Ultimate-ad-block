@@ -189,3 +189,16 @@ DNS queries with counter assertions, and post-VPN network/firewall diagnostics.
 The driver now runs every protocol/security case and reports all failures before
 exiting nonzero, rather than stopping at the first WireGuard failure. No failing
 assertion is removed or converted to a successful/skip result.
+
+### API 26 runtime evidence and remaining API 35 fault
+Run 41972160464: API 26 passed WireGuard, OpenVPN TCP with client certificate +
+password, and OpenVPN UDP certificate-only. Each passing case included real
+Internet TCP, VPN-only IPv4/IPv6 HTTP with a VPN client source address, IPv4/IPv6
+TCP DNS, UDP DNS, blocking toggled without reconnect, socket rebind/reconnect,
+measured counters and fail-closed engine termination. API 35 failed fresh DNS.
+Password-only cases incorrectly rejected the core's informational external-PKI
+flag even when client certificates were explicitly disabled. Matched the core's
+own condition, and prevented later network callbacks overwriting terminal errors.
+For API 35, retained former TUN descriptors until Android publishes the replacement
+interface in LinkProperties, rather than closing them during asynchronous route /
+resolver replacement. Next CI must verify that correction; no API 35 VPN pass yet.

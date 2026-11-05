@@ -18,6 +18,7 @@ public final class BlockVpn extends VpnService {
  static volatile NativeSession activeSession;
  private volatile NativeSession remote;
  private ParcelFileDescriptor guard;
+ private final Map<ConnectivityManager.NetworkCallback,ParcelFileDescriptor> retiringTunnels=new HashMap<>();
  private ConnectivityManager.NetworkCallback networks;
  private volatile Network network,lastNetwork;
  private final ThreadPoolExecutor networkChanges=new ThreadPoolExecutor(1,1,0,TimeUnit.SECONDS,new ArrayBlockingQueue<>(1),new ThreadPoolExecutor.DiscardOldestPolicy());
@@ -126,6 +127,23 @@ public final class BlockVpn extends VpnService {
   return new Notification.Builder(this,"blocking").setSmallIcon(android.R.drawable.ic_lock_lock).setContentTitle(name).setContentText(content).setContentIntent(open).addAction(new Notification.Action.Builder(null,"Stop",stop).build()).setOngoing(true).build();
  }
  void remoteStatus(String value){synchronized(lifecycle){if(!stopping&&!status.equals(value)){status=value;getSystemService(NotificationManager.class).notify(1,notification(value));}}}
+ void finishHandover(ParcelFileDescriptor previous,String iface){
+  ConnectivityManager cm=getSystemService(ConnectivityManager.class);
+  ConnectivityManager.NetworkCallback observer=new ConnectivityManager.NetworkCallback(){
+   @Override public void onAvailable(Network n){LinkProperties lp=cm.getLinkProperties(n);if(lp!=null)onLinkPropertiesChanged(n,lp);}
+   @Override public void onLinkPropertiesChanged(Network n,LinkProperties lp){
+    if(!iface.equals(lp.getInterfaceName()))return;
+    synchronized(lifecycle){if(!retiringTunnels.containsKey(this))return;ParcelFileDescriptor old=retiringTunnels.remove(this);if(old!=null)try{old.close();}catch(IOException ignored){}releaseGuard();try{cm.unregisterNetworkCallback(this);}catch(IllegalArgumentException ignored){}}
+   }
+  };
+  synchronized(lifecycle){
+   if(stopping){if(previous!=null)try{previous.close();}catch(IOException ignored){}return;}
+   retiringTunnels.put(observer,previous);
+   // Closing a former TUN before ConnectivityService applies the new interface can
+   // remove the active resolver's network on newer Android releases.
+   try{cm.registerNetworkCallback(new NetworkRequest.Builder().removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN).addTransportType(NetworkCapabilities.TRANSPORT_VPN).build(),observer);}catch(RuntimeException unavailable){/* Retain the old descriptor fail-closed until shutdown. */}
+  }
+ }
  void releaseGuard(){synchronized(lifecycle){if(guard!=null)try{guard.close();}catch(IOException ignored){}guard=null;}}
  private void resolve(byte[] packet,byte[] query){
   if(stopping)return;
@@ -158,6 +176,7 @@ public final class BlockVpn extends VpnService {
    if(tunnel!=null){try{tunnel.close();}catch(IOException ignored){}tunnel=null;}
    NativeSession session=remote;remote=null;activeSession=null;
    if(networks!=null){getSystemService(ConnectivityManager.class).unregisterNetworkCallback(networks);networks=null;}
+   for(Map.Entry<ConnectivityManager.NetworkCallback,ParcelFileDescriptor> old:retiringTunnels.entrySet()){try{getSystemService(ConnectivityManager.class).unregisterNetworkCallback(old.getKey());}catch(IllegalArgumentException ignored){}if(old.getValue()!=null)try{old.getValue().close();}catch(IOException ignored){}}retiringTunnels.clear();
    ThreadPoolExecutor executor=workers;Thread oldReader=reader;
    if(oldReader!=null && oldReader!=Thread.currentThread())oldReader.interrupt();
    // TLS close_notify may write to the network on Android 8. Never close TLS on main.
