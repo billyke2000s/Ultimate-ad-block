@@ -22,6 +22,7 @@ final class NativeSession implements Closeable {
  private ParcelFileDescriptor tun;
  volatile long connectedSince;
  volatile String connectionState="Connecting",server="";
+ private volatile String engineError="";
  NativeSession(BlockVpn service,DomainRules rules,VpnProfiles.Profile profile){this.service=service;this.rules=rules;this.profile=profile;context=create();}
  static Config wireguard(String text)throws Exception{
   Config c=Config.parse(new ByteArrayInputStream(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
@@ -62,7 +63,7 @@ final class NativeSession implements Closeable {
   }else{
    String config=OpenProfile.validate(profile.config);
    synchronized(this){if(closing)return;open=openCreate();
-   openThread=new Thread(()->{String error=openRun(open,config,profile.user,profile.password,profile.keyPassword);if(!closing){initializationFailed=true;connectionState=error.isEmpty()?"Disconnected — traffic blocked":"OpenVPN: "+error+" — traffic blocked";connectedSince=0;service.remoteStatus(connectionState);}},"openvpn-core");openThread.start();}
+   openThread=new Thread(()->{String error=openRun(open,config,profile.user,profile.password,profile.keyPassword);if(!closing){initializationFailed=true;String reason=engineError.isEmpty()?error.replace('_',' '):engineError;connectionState=reason.isEmpty()?"Disconnected — traffic blocked":"OpenVPN: "+reason+" — traffic blocked";connectedSince=0;service.remoteStatus(connectionState);}},"openvpn-core");openThread.start();}
   }
  }
  private int establishWireguard(String config)throws Exception{
@@ -108,8 +109,9 @@ final class NativeSession implements Closeable {
  int establish(){try{ParcelFileDescriptor[] pair=pair();try{establishBridge(pair[0]);return pair[1].detachFd();}finally{pair[0].close();pair[1].close();}}catch(Exception e){service.remoteStatus("VPN setup failed — traffic blocked");return -1;}}
  int onEvent(String name){
   if(closing)return 0;
+  if(name.startsWith("ERROR:")||Arrays.asList("AUTH_FAILED","CERT_VERIFY_FAIL","TLS_ERROR","CONNECTION_TIMEOUT").contains(name))engineError=(name.startsWith("ERROR:")?name.substring(6):name).replace('_',' ');
   if(name.startsWith("ERROR:")&&name.substring(6).matches("[A-Z_]{1,64}")){connectionState=name.substring(6).replace('_',' ')+" — traffic blocked";connectedSince=0;}
-  else if(name.equals("CONNECTED")){connectionState="Connected";connectedSince=android.os.SystemClock.elapsedRealtime();}
+  else if(name.equals("CONNECTED")){engineError="";connectionState="Connected";connectedSince=android.os.SystemClock.elapsedRealtime();}
   else if(Arrays.asList("RECONNECTING","DISCONNECTED","AUTH_FAILED","CERT_VERIFY_FAIL","TLS_ERROR","CONNECTION_TIMEOUT","RESOLVE","CONNECTING","WAIT","TCP_CONNECT").contains(name)){connectionState=name.replace('_',' ');connectedSince=0;}
   service.remoteStatus(connectionState);return 1;
  }
